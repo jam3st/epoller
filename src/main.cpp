@@ -1,5 +1,6 @@
 ﻿#include <iostream>
 #include <functional>
+#include <regex>
 
 #include "engine.hpp"
 #include "udpclient.hpp"
@@ -17,7 +18,7 @@ void runUnit (const std::string id, std::function<void()>what) {
 	try {
 		Engine::init();
 		what();
-		Engine::start(0);
+		Engine::start(4);
 	} catch(const std::exception& e) {
 		   std::cerr << e.what() << "\n";
 	} catch ( ... ) {
@@ -34,6 +35,7 @@ class TcpEcho : public TcpSockIface {
 		}
 		virtual void onConnect(TcpStream& s, const struct InetDest& ) {
 			logDebug("TcpEcho onConnect");
+			Engine::stop();
 			Bytes greeting = stringToBytes("Ello\n");
 			s.queueWrite(greeting);
 			s.disconnect();
@@ -70,13 +72,7 @@ class TcpEchoWithGreeting : public TcpSockIface {
 			logDebug("TcpEcho onConnect");
 			Bytes greeting = stringToBytes("Ello\n");
 			s.queueWrite(greeting);
-			s.setTimer(0, NanoSecs(5000000000));
-			s.setTimer(1, NanoSecs(1));
-			s.setTimer(2, NanoSecs(4000000000));
-			s.setTimer(3, NanoSecs(9000000000));
-			s.setTimer(4, NanoSecs(5000000000));
-			s.setTimer(5, NanoSecs(5000000000));
-			s.setTimer(5, NanoSecs(5000000000));
+			s.setTimer(5, NanoSecs(1000000000));
 		}
 
 		virtual void onReadCompleted( TcpStream& s, const Bytes& x) {
@@ -94,11 +90,113 @@ class TcpEchoWithGreeting : public TcpSockIface {
 		}
 
 		virtual void onTimerExpired(TcpStream& s, int tid) {
-			s.queueWrite( { 'x', 'p', ' ', (unsigned char)('0' + tid), '\n' });
+			s.setTimer(5, NanoSecs(1000000000));
 			logDebug("blah expired " + intToString(tid));
 
 		}
 };
+
+std::pair<const Bytes::iterator, const Bytes::iterator>
+findFirstPattern(const Bytes::iterator begin, const Bytes::iterator end, const Bytes& pattern) {
+	size_t matchPos = 0;
+	auto matchBegin = begin;
+	for(auto pos = begin; pos != end; ++pos) {
+		if(::tolower(*pos) == ::tolower(pattern[matchPos]) || pattern[matchPos] == '?') {
+			if(++matchPos == pattern.size()) {
+				return std::make_pair(matchBegin, pos);
+			}
+		} else {
+			matchBegin = pos;
+			matchPos = 0;
+		}
+	}
+	return std::make_pair(end,end);
+}
+
+class HttpProxy : public TcpSockIface {
+	public:
+		HttpProxy() {}
+		virtual ~HttpProxy() {
+			logDebug("~TcpEchoWithGreeting destroyed");
+		}
+		virtual void onConnect(TcpStream& s, const struct InetDest& ) {
+			logDebug("TcpEcho onConnect");
+			s.setTimer(0, NanoSecs(300000000000));
+			s.setTimer(5, NanoSecs(10000000000));
+			s.setTimer(5, NanoSecs(10000000000));
+			s.setTimer(5, NanoSecs(10000000000));
+		}
+
+		virtual void onReadCompleted( TcpStream& , const Bytes& x) {
+			logDebug("TcpEcho onReadCompleted");
+			header.insert(header.end(), x.begin(), x.end());
+
+			bool doubleCr = false;
+			if(header.size() < 4) {
+				return;
+			}
+			bool prevCrLf = false;
+			bool prevlF = *header.end() == '\n';
+			//				std::find(header.begin(), header.end(), Bytes{ '\r', '\n', '\r', '\n' } );
+			for(auto it = std::end(header) - 1;	it != std::begin(header); --it) {
+				if(prevlF && *it == '\r' && prevCrLf) {
+					doubleCr = true;
+					logDebug("Got double CRLF");
+					break;
+				} else if(prevlF && *it == '\r') {
+					prevCrLf = true;
+					prevlF = false;
+				} else if(!prevlF && *it == '\n') {
+					prevlF = true;
+				} else {
+					prevCrLf = false;
+					prevlF = false;
+				}
+			}
+			if(!doubleCr) {
+				return;
+			}
+			auto crPos = header.end();
+			for(auto start = header.begin(); start != header.end(); start = crPos + 1) {
+				while(*start == '\n') {
+					start++;
+				}
+				crPos = std::find(start, header.end(), '\r');
+								Bytes getPost(start, crPos);
+				logDebug("line: " + std::string{getPost.begin(), getPost.end() } );
+				auto host = findFirstPattern(getPost.begin(), getPost.end(), { 'H', 'o', 's', 't', ':', '?'});
+				if(host.first != host.second) {
+					logDebug("host: " + std::string{host.second + 1, getPost.end()} );
+				}
+
+				if(crPos == header.end()) {
+					break;
+				}
+			}
+//			std::regex re("GET.*");
+//			std::smatch m;
+//			std::string tmp(header.begin(), header.end());
+//			std::regex_search(tmp, m, re);
+//			 std::cout << " ECMA (depth first search) match: " << m[0] << '\n';
+		}
+
+		virtual void onReadyToWrite( TcpStream&) {
+			logDebug("TcpEcho onReadyToWrite");
+		}
+
+		virtual void onDisconnect( TcpStream& s) {
+			logDebug("TcpEcho onDisconnect");
+			s.disconnect();
+		}
+
+		virtual void onTimerExpired(TcpStream& s, int tid) {
+			s.setTimer(5, NanoSecs(1000000000));
+			logDebug("blah expired " + intToString(tid));
+		}
+	private:
+		Bytes header;
+};
+
 
 int main (const int argc, const char* const argv[]) {
 	if(argc > 1) {
@@ -108,7 +206,7 @@ int main (const int argc, const char* const argv[]) {
 
 	runUnit ("exp", [] () {
 		TcpListener::create(1025, [] () { return std::make_shared<TcpEcho>(); } );
-		TcpListener::create(1026, [] () { return std::make_shared<TcpEchoWithGreeting>(); } );
+		TcpListener::create(1024, [] () { return std::make_shared<HttpProxy>(); } );
 
 
 //		Engine::add(TcpConn::create("::1", 1025,

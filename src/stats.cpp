@@ -8,8 +8,8 @@ namespace Sb {
 	}
 
 	Stats::Stats() :
-		creation(HighResClock::now()),
-		mark(HighResClock::now()),
+		creation(SteadyClock::now()),
+		mark(SteadyClock::now()),
 		idleNs(0),
 		busyNs(0),
 		counter(0),
@@ -19,7 +19,7 @@ namespace Sb {
 	void Stats::MarkIdleStart() {
 		assert(active, "Already active.");
 		active = false;
-		auto now = HighResClock::now();
+		auto now = SteadyClock::now();
 		idleNs += elapsed(now, mark);
 		mark = now;
 	}
@@ -27,13 +27,13 @@ namespace Sb {
 	void Stats::MarkIdleEnd() {
 		assert(!active, "Not activated yet.");
 		active = true;
-		auto now = HighResClock::now();
+		auto now = SteadyClock::now();
 		busyNs += elapsed(now, mark);
 		mark = now;
 	}
 
 	NanoSecs Stats::GetBusyTimeNs() const {
-		auto busyTime = active ? elapsed(HighResClock::now(), mark) : NanoSecs(0);
+		auto busyTime = active ? elapsed(SteadyClock::now(), mark) : NanoSecs(0);
 
 		if(busyTime < NanoSecs(0)) {
 			logWarn("Please check clocks. Possible correction as busytime is "

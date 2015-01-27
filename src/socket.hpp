@@ -1,16 +1,26 @@
 ﻿#pragma once
-#include "epoll.hpp"
+#include "timeevent.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 
 namespace Sb {
-	class Socket : virtual public Epoll {
+	class Socket : virtual public TimeEvent {
 		public:
-			explicit Socket();
+			explicit Socket(const int fd);
 			enum SockType {
 				UDP = 1,
 				TCP = 2
 			};
+		protected:
+			virtual int getFd() const final;
+			virtual int dupFd() const final;
+		private:
+			friend class Engine;
+			virtual void handleError() = 0;
+			virtual void handleRead() = 0;
+			virtual void handleWrite() = 0;
+		protected:
+			const int fd;
 		protected:
 			virtual ~Socket();
 			static int createSocket(const SockType type);

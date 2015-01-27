@@ -8,7 +8,7 @@ PKGCONFIG += botan
 
 INCLUDEPATH += ../src
 LIBS += -pthread
-QMAKE_CXXFLAGS += -g3 --std=c++14 -Wall -Werror
+QMAKE_CXXFLAGS += --std=c++14 -Wall -Werror
 
 
 
@@ -28,8 +28,9 @@ SOURCES += \
 	../src/tlsclientwrapper.cpp \
 	../src/socket.cpp \
 	../src/tcpconn.cpp \
-    ../src/epoll.cpp \
-    ../src/semaphore.cpp
+	../src/semaphore.cpp \
+    ../src/timers.cpp \
+    ../src/timevent.cpp
 
 HEADERS += \
 	../src/types.hpp \
@@ -47,6 +48,7 @@ HEADERS += \
 	../src/stats.hpp \
 	../src/syncvec.hpp \
 	../src/tcpconn.hpp \
-    ../src/epoll.hpp \
-    ../src/semaphore.hpp \
-    ../src/engine.hpp
+	../src/semaphore.hpp \
+	../src/engine.hpp \
+    ../src/timeevent.hpp \
+    ../src/timers.hpp

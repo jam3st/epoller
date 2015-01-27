@@ -59,10 +59,11 @@ namespace Sb {
 		if(type > level) {
 			return;
 		}
-		auto now_ns = std::chrono::duration_cast<NanoSecs>(
-								HighResClock::now().time_since_epoch()).count();
-		std::time_t secs = now_ns / NanoSecsInSecs;
-		int64_t nsecs = now_ns % NanoSecsInSecs;
+		int64_t nowNs = std::chrono::duration_cast<NanoSecs>(
+						 SteadyClock::now().time_since_epoch()).count() +
+					 driftCorrectionInNs;
+		std::time_t secs = nowNs / NanoSecsInSecs;
+		int64_t nsecs = nowNs % NanoSecsInSecs;
 
 		lock.lock();
 		std::tm* local_time_now = std::localtime(&secs);

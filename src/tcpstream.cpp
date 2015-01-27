@@ -14,7 +14,7 @@ namespace Sb {
 	}
 
 	TcpStream::TcpStream(const int fd, const InetDest remote, std::shared_ptr<TcpSockIface> client) :
-						Epoll(fd),
+						Socket(fd),
 						remote(remote),
 						client(client) {
 		logDebug(std::string("TcpStream::TcpStream"));
@@ -79,7 +79,7 @@ namespace Sb {
 		}
 	}
 
-	void TcpStream::handleTimer(int timerId) {
+	void TcpStream::handleTimer(const size_t timerId) {
 		logDebug("TcpListener::handleTimer() " + intToString(timerId));
 		client->onTimerExpired(*this, timerId);
 	}

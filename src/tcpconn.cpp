@@ -4,7 +4,7 @@
 
 namespace Sb {
 	UdpServer::UdpServer(const uint16_t port)
-		: Epoll(Socket::createUdpSocket()) {
+		: Socket(Socket::createUdpSocket()) {
 		logDebug(std::string("UdpServer::UdpServer " + intToString(port)));
 		reuseAddress();
 		bind(port);
@@ -35,7 +35,7 @@ namespace Sb {
 		// TODO
 	}
 
-	void UdpServer::handleTimer(int timerId) {
+	void UdpServer::handleTimer(const size_t timerId) {
 		logDebug("UdpServer::handleTimer " + intToString(timerId));
 		// TODO
 	}

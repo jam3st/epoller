@@ -31,7 +31,7 @@ namespace Sb {
 			virtual void handleRead();
 			virtual void handleWrite();
 			virtual void handleError();
-			virtual void handleTimer(int timerId);
+			virtual void handleTimer(const size_t timerId);
 
 		private:
 			const struct InetDest remote;

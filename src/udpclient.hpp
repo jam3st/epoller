@@ -9,7 +9,7 @@ namespace Sb {
 			void handleRead();
 			void handleWrite();
 			void handleError();
-			void handleTimer(int timerId);
+			void handleTimer(const size_t timerId);
 			UdpClient(const std::string& address, const uint16_t port, const Bytes& initialData);
 		private:
 			void createStream(const int newFd);

@@ -12,7 +12,7 @@ namespace Sb {
 			void handleRead();
 			void handleWrite();
 			void handleError();
-			void handleTimer(int timerId);
+			void handleTimer(const size_t timerId);
 			TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpSockIface>()> clientFactory);
 		private:
 			void createStream(const int newFd);

@@ -5,7 +5,7 @@
 
 namespace Sb {
 	TlsTcpStream::TlsTcpStream(const int fd, const Bytes& initialData)
-		: Epoll(fd) {
+		: Socket(fd) {
 		logDebug(std::string("TlsTcpStream::TlsTcpStream"));
 		queueWrite(initialData);
 	}

@@ -4,7 +4,7 @@
 
 namespace Sb {
 	UdpClient::UdpClient(const std::string& address, const uint16_t port, const Bytes& initialData)
-		: Epoll(Socket::createUdpSocket()) {
+		: Socket(Socket::createUdpSocket()) {
 		logDebug(std::string("UdpClient::UdpClient " + intToString(port)));
 		pErrorThrow(fd);
 		dest = destFromString(address, port);
@@ -36,7 +36,7 @@ namespace Sb {
 
 	}
 
-	void UdpClient::handleTimer(int) {
+	void UdpClient::handleTimer(const size_t) {
 
 	}
 }

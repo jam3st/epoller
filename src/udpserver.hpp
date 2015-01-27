@@ -11,7 +11,7 @@ namespace Sb {
 			void handleRead();
 			void handleWrite();
 			void handleError();
-			void handleTimer(int timerId);
+			void handleTimer(const size_t timerId);
 		private:
 	};
 }

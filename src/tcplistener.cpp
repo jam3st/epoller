@@ -11,7 +11,7 @@ namespace Sb {
 	}
 
 	TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpSockIface>()> clientFactory)
-		: Epoll(Socket::createTcpSocket()),
+		: Socket(Socket::createTcpSocket()),
 				clientFactory(clientFactory) {
 		logDebug(std::string("TcpListener::TcpListener " + intToString(port)));
 		reuseAddress();
@@ -42,7 +42,7 @@ namespace Sb {
 		logDebug("Epollable::handleWrite()");
 	}
 
-	void TcpListener::handleTimer(int timerId) {
+	void TcpListener::handleTimer(const size_t timerId) {
 		logDebug("Epollable::handleTimer() " + intToString(timerId));
 	}
 

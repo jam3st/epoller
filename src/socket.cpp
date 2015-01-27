@@ -17,14 +17,29 @@ namespace Sb {
 
 	static std::string inetAddressToString(const SocketAddress& addr);
 
-	Socket::Socket()
-		: Epoll(-1) {
+	Socket::Socket(const int fd)
+	 : fd(fd) {
+		pErrorThrow(fd);
 		logDebug("Socket::Socket()");
 		Socket::makeSocketNonBlocking(fd);
 	}
 
 	Socket::~Socket() {
+		logDebug("Socket::~Socket() closed and shutdown	" + intToString(fd));
+		::close(fd);
 	}
+
+	int Socket::dupFd() const  {
+		logDebug("Epollable::dupFd");
+		auto dup = ::dup(fd);
+		pErrorThrow(dup);
+		return dup;
+	}
+
+	int Socket::getFd() const {
+		return fd;
+	}
+
 
 	void Socket::makeSocketNonBlocking(const int fd) {
 		auto flags = ::fcntl(fd, F_GETFL, 0);

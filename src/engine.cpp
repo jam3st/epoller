@@ -6,6 +6,7 @@
 #include "engine.hpp"
 #include "semaphore.hpp"
 #include "utils.hpp"
+#include "socket.hpp"
 #include "logger.hpp"
 #include <sys/timerfd.h>
 
@@ -16,9 +17,11 @@ namespace Sb {
 		logDebug("Worker destroyed");
 		thread.detach();
 	}
+
 	Engine::Engine()
 		: stopped(false),
 		  epollTid(std::this_thread::get_id()),
+		  epollHandle(::pthread_self()),
 		  epollFd(::epoll_create(23423)),
 		  timerFd(::timerfd_create (CLOCK_MONOTONIC, TFD_NONBLOCK)) {
 		initSignals();
@@ -51,9 +54,21 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		Engine::theEngine = nullptr;
 	}
 
+	void Engine::stop() {
+		if(Engine::theEngine != nullptr) {
+			Engine::theEngine->doStop();
+		}
+	}
+
 	void Engine::signalHandler(int signalNum) {
-		if(signalNum != SIGCONT && Engine::theEngine->epollTid == std::this_thread::get_id()) {
-			Engine::theEngine->stop();
+		if(signalNum != SIGCONT) {
+			Engine::theEngine->doSignalHandler();
+		}
+	}
+
+	void Engine::doSignalHandler() {
+		if(epollTid == std::this_thread::get_id()) {
+			Engine::stop();
 		}
 	}
 
@@ -79,13 +94,11 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		for(int i = 0; i < initialNumThreadsToSpawn; i++) {
 			logDebug("Started thread " + intToString(i));
 			slaves.push_back(new Worker(Engine::doWork));
-
 		}
 		doEpoll();
 		bool waiting = true;
 		for(int i = MAX_SHUTDOWN_ATTEMPTS; i > 0 && waiting; i--) {
 			for(auto& slave: slaves) {
-				sem.signal();
 				sem.signal();
 				interrupt(*slave);
 			}
@@ -104,18 +117,29 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		logDebug("All done, exiting.");
 	}
 
-	void Engine::setTimer(Epoll* owner, const int timerId, const NanoSecs timeout) {
+	void Engine::setTimer(const TimeEvent* owner, const size_t timerId, const NanoSecs& timeout) {
 		if(Engine::theEngine == nullptr) {
 			throw std::runtime_error("Please call Engine::Init() first");
 		}
-		theEngine->doSetTimer(owner, timerId, timeout);
+		Engine::theEngine->doSetTimer(owner, timerId, timeout);
 	}
 
-	void Engine::cancelTimer(Epoll* owner, const int timerId) {
+	void Engine::doSetTimer(const TimeEvent* owner, const size_t timerId, const NanoSecs& timeout) {
+		timers.setTimer(owner, timerId, timeout);
+		armTimerIn(timers.getTrigger());
+	}
+
+	NanoSecs Engine::cancelTimer(TimeEvent* owner, const size_t timerId) {
 		if(Engine::theEngine == nullptr) {
 			throw std::runtime_error("Please call Engine::Init() first");
 		}
-		theEngine->doCancelTimer(owner, timerId);
+		return Engine::theEngine->doCancelTimer(owner, timerId);
+	}
+
+	NanoSecs Engine::doCancelTimer(TimeEvent* owner, const size_t timerId) {
+		auto ret = timers.cancelTimer(owner, timerId);
+		armTimerIn(timers.getTrigger());
+		return ret;
 	}
 
 	void Engine::onTimerExpired( ) {
@@ -123,12 +147,22 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 			throw std::runtime_error("Forgot to cancel the timer");
 		}
 		Engine::theEngine->doOnTimerExpired();
-		logDebug("Engine::onTimerExpired");
+	}
+
+	void Engine::doOnTimerExpired() {
+		uint64_t value;
+		pErrorThrow(::read(timerFd, &value, sizeof(value)));
+		auto ev = timers.onTimerExpired();
+		auto what = getEv(ev.first);
+		if(what != nullptr) {
+			what->handleTimer(ev.second);
+		}
+		armTimerIn(timers.getTrigger());
+		logDebug("Engine::doOnTimerExpired");
 	}
 
 	void Engine::armTimerIn(const NanoSecs& timeout) const	{
 		logDebug("Engine::armTimerIn " + intToString(timeout.count()));
-		assert(timeout.count() > 0, "Invalid timeout, must be greater than zero");
 		itimerspec new_timer;
 		new_timer.it_interval.tv_sec = 0;
 		new_timer.it_interval.tv_nsec = 0;
@@ -138,38 +172,7 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		pErrorThrow(::timerfd_settime(timerFd, 0, &new_timer, &old_timer));
 	}
 
-	void Engine::disArmTimer() const {
-		itimerspec new_timer;
-		new_timer.it_interval.tv_sec = 0;
-		new_timer.it_interval.tv_nsec = 0;
-		new_timer.it_value.tv_sec = 0;
-		new_timer.it_value.tv_nsec = 0;
-		itimerspec old_timer;
-		pErrorThrow(::timerfd_settime(timerFd, 0, &new_timer, &old_timer));
-	}
-
-	void Engine::doOnTimerExpired() {
-		uint64_t value;
-		::read(timerFd, &value, 8);
-		logDebug("Engine::doOnTimerExpired() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
-		const Epoll* ep = nullptr;
-		int id = -1;
-		{
-			std::lock_guard<std::mutex> lock(timeLock);
-			ep = timesByDate.begin()->second.ep;
-			id = timesByDate.begin()->second.id;
-			auto diff = HighResClock::now() - timesByDate.begin()->first;
-			logDebug("Engine::doOnTimerExpired diff " + intToString(diff.count()));
-		}
-		doCancelTimer(ep, id);
-		auto what = getEpoll(ep);
-		what->handleTimer(id);
-		logDebug("Engine::doOnTimerExpired done");
-	}
-
-	std::shared_ptr<Epoll> Engine::getEpoll(const Epoll* what)
+	std::shared_ptr<TimeEvent> Engine::getEv(const TimeEvent* what)
 	{
 		std::lock_guard<std::mutex> sync(evHashLock);
 		auto it = eventHash.find(what);
@@ -180,112 +183,7 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		return it->second;
 	}
 
-	void Engine::doSetTimer(const Epoll* what, const int timerId, const NanoSecs& timeout) {
-		logDebug("Engine::doSetTimer() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
-		logDebug("Timer::doSetTimer() for " + intToString(timerId) + " duration "
-				 + intToString(timeout.count()) + "ns");
-
-		auto now = HighResClock::now();
-		TimePointNs when = now + timeout;
-		std::lock_guard<std::mutex> lock(timeLock);
-		// Remove old timer
-		auto oldStart = timesByDate.begin();
-		auto iiByOwner = timersByOwner.equal_range(what);
-		if(iiByOwner.first != iiByOwner.second) {
-			for_each(iiByOwner.first, iiByOwner.second, [&, timerId](const auto& bo) {
-				auto iiByDate = timesByDate.equal_range(bo.second.tp);
-				if(iiByDate.first != iiByDate.second) {
-					for(auto it = iiByDate.first; it != iiByDate.second; ++it) {
-						if(timerId == it->second.id) {
-							timesByDate.erase(it);
-						}
-					}
-				}
-			});
-			for(auto it = iiByOwner.first; it != iiByOwner.second; ++it) {
-				if(timerId == it->second.id) {
-					timersByOwner.erase(it);
-				}
-			}
-		}
-		// remove old timer
-		logDebug("Engine::doSetTimer() remove  BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
-		timersByOwner.insert(std::make_pair(what,  TimerDateId { when, timerId }));
-		timesByDate.insert(std::make_pair(when, TimerEpollId { what, timerId }));
-		if(oldStart != timesByDate.begin()) {
-			armTimerIn(timeout);
-		}
-		logDebug("Engine::doSetTimer() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
-	}
-
-	void Engine::doCancelTimer(const Epoll* what, const int timerId) {
-		logDebug("Engine::doCancelTimer() for " + intToString(timerId));
-		logDebug("Engine::doCancelTimer() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
-		std::lock_guard<std::mutex> sync(timeLock);
-		auto oldStart = timesByDate.begin();
-		auto iiByOwner = timersByOwner.equal_range(what);
-		if(iiByOwner.first != iiByOwner.second) {
-			for_each(iiByOwner.first, iiByOwner.second, [&, timerId](const auto& bo) {
-				auto iiByDate = timesByDate.equal_range(bo.second.tp);
-				if(iiByDate.first != iiByDate.second) {
-					for(auto it = iiByDate.first; it != iiByDate.second; ++it) {
-						if(timerId == it->second.id) {
-							timesByDate.erase(it);
-						}
-					}
-				}
-			});
-			for(auto it = iiByOwner.first; it != iiByOwner.second; ++it) {
-				if(timerId == it->second.id) {
-					timersByOwner.erase(it);
-				}
-			}
-		}
-		logDebug("Engine::doCancelTimer() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
-		if(oldStart != timesByDate.begin()) {
-			if(timesByDate.size() > 0) {
-				armTimerIn(std::max(NanoSecs {1 }, NanoSecs { timesByDate.begin()->first -  HighResClock::now() }));
-			} else {
-				disArmTimer();
-			}
-		}
-	}
-
-	void Engine::doCancelAllTimers(const Epoll* what) {
-		logDebug("Engine::doCancelAllTimers() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
-		std::lock_guard<std::mutex> sync(timeLock);
-		auto oldStart = timesByDate.begin();
-		auto iiByOwner = timersByOwner.equal_range(what);
-		for_each(iiByOwner.first, iiByOwner.second, [&](const auto& bo) {
-			 auto iiByDate = timesByDate.equal_range(bo.second.tp);
-			 timesByDate.erase(iiByDate.first, iiByDate.second);
-		});
-		timersByOwner.erase(iiByOwner.first, iiByOwner.second);
-		if(oldStart != timesByDate.begin()) {
-			if(timesByDate.size() > 0) {
-				armTimerIn(std::max(NanoSecs {1 }, NanoSecs { timesByDate.begin()->first -  HighResClock::now() }));
-			} else {
-				disArmTimer();
-			}
-		}
-		logDebug("Engine::doCancelAllTimers() BO: " +
-				 intToString(timersByOwner.size()) + " BD: "+
-				 intToString(timesByDate.size()));
-	}
-
-	void Engine::doAdd(const std::shared_ptr<Epoll>& what) {
+	void Engine::doAdd(const std::shared_ptr<Socket>& what) {
 		std::lock_guard<std::mutex> sync(evHashLock);
 		eventHash.insert(std::make_pair(what.get(), what));
 		epoll_event event = { 0, { 0 } };
@@ -294,24 +192,24 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		pErrorThrow (::epoll_ctl (epollFd, EPOLL_CTL_ADD, what->getFd(), &event));
 	}
 
-	void Engine::add(const std::shared_ptr<Epoll>& what) {
+	void Engine::add(const std::shared_ptr<Socket>& what) {
 		if(Engine::theEngine == nullptr) {
 			throw std::runtime_error("Please call Engine::Init() first");
 		}
 		theEngine->doAdd(what);
 	}
 
-	void Engine::doRemove(const Epoll* what) {
+	void Engine::doRemove(const Socket* what) {
 		std::lock_guard<std::mutex> sync(evHashLock);
 		epoll_event event = { 0, { 0 } };
 		auto it = eventHash.find(what);
 		auto ptr = it->second;
-		pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_DEL, ptr->getFd(), &event));
-		doCancelAllTimers(what);
+		pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_DEL, what->getFd(), &event));
+		timers.cancelAllTimers(what);
 		eventHash.erase(it);
 	}
 
-	void Engine::remove(const Epoll* what)
+	void Engine::remove(const Socket* what)
 	{
 		if(Engine::theEngine == nullptr) {
 			throw std::runtime_error("Please call Engine::Init() first");
@@ -325,9 +223,26 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		}
 	}
 
-	void Engine::stop() {
+	void Engine::doStop() {
 		stopped = true;
+		if(epollTid != std::this_thread::get_id()) {
+			::pthread_kill(epollHandle, SIGINT);
+		}
 	}
+
+	void Engine::run(Socket& sock, const uint32_t events) const {
+		logDebug("Engine::Run " + pollEventsToString(events));
+		if((events & EPOLLIN) != 0) {
+			sock.handleRead();
+		}
+		if((events & EPOLLRDHUP) != 0 || (events & EPOLLERR) != 0) {
+			sock.handleError();
+		}
+		if((events & EPOLLOUT) != 0) {
+			sock.handleWrite();
+		}
+	}
+
 
 	void Engine::worker(Worker& me) {
 		logDebug("Worker started");
@@ -350,9 +265,9 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 				if(event.epollEvent() == nullptr) {
 					Engine::onTimerExpired();
 				} else  {
-					std::shared_ptr<Epoll> ptr = getEpoll(event.epollEvent());
+					std::shared_ptr<TimeEvent> ptr = getEv(event.epollEvent());
 					if(ptr != nullptr) {
-						ptr->run(event.epollEvents());
+						run(*dynamic_cast<Socket*>(ptr.get()), event.epollEvents());
 					}
 				}
 			}
@@ -377,7 +292,7 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 			while(!stopped) {
 				epoll_event events[EPOLL_EVENTS_PER_RUN];
 				int num = epoll_wait(epollFd, events, EPOLL_EVENTS_PER_RUN, -1);
-				logDebug("Epoll " + intToString(num));
+				logDebug("doEpoll " + intToString(num));
 				if(stopped) {
 					break;
 				}
@@ -391,7 +306,7 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 				} else {
 					for(int i = 0; i < num; i++) {
 						logDebug("Added");
-						eventQueue.add(EpollEvent(static_cast<Epoll *>(events[i].data.ptr), events[i].events));
+						eventQueue.add(EpollEvent(static_cast<Socket*>(events[i].data.ptr), events[i].events));
 						sem.signal();
 					}
 				}

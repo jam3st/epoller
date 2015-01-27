@@ -10,6 +10,7 @@
 
 
 namespace Sb {
+	extern int64_t driftCorrectionInNs;
 	const int64_t NanoSecsInSecs = { 1000000000 };
 	const int numBitsPerByte = 8; // By definition ISO/IEC 9899:TC3
 	const int LISTEN_MAX_PENDING = 1;
@@ -17,8 +18,8 @@ namespace Sb {
 
 	typedef std::chrono::nanoseconds NanoSecs;
 	typedef std::chrono::seconds Seconds;
-	typedef std::chrono::high_resolution_clock HighResClock;
-	typedef std::chrono::time_point<HighResClock, NanoSecs> TimePointNs;
+	typedef std::chrono::steady_clock SteadyClock;
+	typedef std::chrono::time_point<SteadyClock, NanoSecs> TimePointNs;
 
 	InetDest destFromString(const std::string& dest, const uint16_t port);
 
