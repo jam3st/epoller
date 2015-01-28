@@ -1,20 +1,25 @@
-﻿#include "udpserver.hpp"
+﻿#include "tcpconn.hpp"
 #include "utils.hpp"
 #include "types.hpp"
 
 namespace Sb {
-	UdpServer::UdpServer(const uint16_t port)
-		: Socket(Socket::createUdpSocket()) {
-		logDebug(std::string("UdpServer::UdpServer " + intToString(port)));
-		reuseAddress();
-		bind(port);
+	void TcpConn::create(const struct InetDest& dest, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) {
+		auto ref = std::make_shared<TcpConn>(clientFactory);
+		Engine::add(ref);
+		logDebug("TcpConn::create()");
+		ref->connect(dest);
 	}
 
-	UdpServer::~UdpServer() {
-		logDebug("UdpServer::~UdpServer()");
+	TcpConn::TcpConn(std::function<std::shared_ptr<TcpStreamIf>()> clientFactory)
+		:	Socket(fd),
+		  clientFactory(clientFactory) {
 	}
 
-	void UdpServer::handleRead() {
+	TcpConn::~TcpConn() {
+		logDebug("TcpConn::~TcpConn()");
+	}
+
+	void TcpConn::handleRead() {
 		logDebug("UdpServer::handleRead");
 		Bytes data(MAX_PACKET_SIZE);
 		InetDest from ;
@@ -26,16 +31,16 @@ namespace Sb {
 		sendDatagram(data, from);
 	}
 
-	void UdpServer::handleWrite() {
+	void TcpConn::handleWrite() {
 		logDebug("UdpServer::handleWrite()");
 	}
 
-	void UdpServer::handleError() {
+	void TcpConn::handleError() {
 		logDebug("TcpConnector::handleError ");
 		// TODO
 	}
 
-	void UdpServer::handleTimer(const size_t timerId) {
+	void TcpConn::handleTimer(const size_t timerId) {
 		logDebug("UdpServer::handleTimer " + intToString(timerId));
 		// TODO
 	}

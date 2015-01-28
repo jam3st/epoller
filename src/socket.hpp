@@ -7,6 +7,7 @@ namespace Sb {
 	class Socket : virtual public TimeEvent {
 		public:
 			explicit Socket(const int fd);
+			static InetDest destFromString(const std::string& where, const uint16_t port);
 			enum SockType {
 				UDP = 1,
 				TCP = 2
@@ -38,6 +39,5 @@ namespace Sb {
 			int	accept() const;
 			int receiveDatagram(Bytes& data, InetDest& whereFrom) const;
 			int sendDatagram(const Bytes& data, const InetDest& whereTo) const;
-			InetDest destFromString(const std::string& where, const uint16_t port) const;
 	};
 }

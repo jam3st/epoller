@@ -142,7 +142,7 @@ namespace Sb {
 		::connect(fd, &addr.addr, sizeof addr.addrIn6);
 	}
 
-	InetDest Socket::destFromString(const std::string& where, const uint16_t port) const {
+	InetDest Socket::destFromString(const std::string& where, const uint16_t port) {
 		InetDest dest;
 		dest.port = port;
 		inet_pton(AF_INET6, &where[0], &dest.addr);

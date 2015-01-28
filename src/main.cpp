@@ -27,7 +27,7 @@ void runUnit (const std::string id, std::function<void()>what) {
 }
 
 
-class TcpEcho : public TcpSockIface {
+class TcpEcho : public TcpStreamIf {
 	public:
 		TcpEcho() {}
 		virtual ~TcpEcho() {
@@ -47,7 +47,7 @@ class TcpEcho : public TcpSockIface {
 			s.disconnect();
 		}
 
-		virtual void onReadyToWrite( TcpStream&) {
+		virtual void onWriteCompleted( TcpStream&) {
 			logDebug("TcpEcho onReadyToWrite");
 		}
 
@@ -62,7 +62,7 @@ class TcpEcho : public TcpSockIface {
 		}
 };
 
-class TcpEchoWithGreeting : public TcpSockIface {
+class TcpEchoWithGreeting : public TcpStreamIf {
 	public:
 		TcpEchoWithGreeting() {}
 		virtual ~TcpEchoWithGreeting() {
@@ -80,7 +80,7 @@ class TcpEchoWithGreeting : public TcpSockIface {
 			s.queueWrite(x);
 		}
 
-		virtual void onReadyToWrite( TcpStream&) {
+		virtual void onWriteCompleted( TcpStream&) {
 			logDebug("TcpEcho onReadyToWrite");
 		}
 
@@ -113,7 +113,7 @@ findFirstPattern(const Bytes::iterator begin, const Bytes::iterator end, const B
 	return std::make_pair(end,end);
 }
 
-class HttpProxy : public TcpSockIface {
+class HttpProxy : public TcpStreamIf {
 	public:
 		HttpProxy() {}
 		virtual ~HttpProxy() {
@@ -180,7 +180,7 @@ class HttpProxy : public TcpSockIface {
 //			 std::cout << " ECMA (depth first search) match: " << m[0] << '\n';
 		}
 
-		virtual void onReadyToWrite( TcpStream&) {
+		virtual void onWriteCompleted( TcpStream&) {
 			logDebug("TcpEcho onReadyToWrite");
 		}
 
@@ -197,7 +197,6 @@ class HttpProxy : public TcpSockIface {
 		Bytes header;
 };
 
-
 int main (const int argc, const char* const argv[]) {
 	if(argc > 1) {
 		std::cerr << argv[0] <<  " invalid arguments.\n";
@@ -207,7 +206,7 @@ int main (const int argc, const char* const argv[]) {
 	runUnit ("exp", [] () {
 		TcpListener::create(1025, [] () { return std::make_shared<TcpEcho>(); } );
 		TcpListener::create(1024, [] () { return std::make_shared<HttpProxy>(); } );
-
+		TcpConn::create( Socket::destFromString("192.168.1.2", 80), [] () { return std::make_shared<TcpEchoWithGreeting>(); });
 
 //		Engine::add(TcpConn::create("::1", 1025,
 //					[] (TcpStream& stream, const Bytes& data) {

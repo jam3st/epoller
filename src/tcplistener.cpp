@@ -5,12 +5,11 @@
 
 
 namespace Sb {
-	void TcpListener::create(const uint16_t port,
-												   std::function<std::shared_ptr<TcpSockIface>()> clientFactory) {
+	void TcpListener::create(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) {
 		Engine::add(std::make_shared<TcpListener>(port, clientFactory));
 	}
 
-	TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpSockIface>()> clientFactory)
+	TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory)
 		: Socket(Socket::createTcpSocket()),
 				clientFactory(clientFactory) {
 		logDebug(std::string("TcpListener::TcpListener " + intToString(port)));

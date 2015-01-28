@@ -8,16 +8,16 @@
 namespace Sb {
 	class TcpConn final : virtual public Socket {
 		public:
-			static void create(const std::string&address, const uint16_t port,
-													 std::function<std::shared_ptr<TcpSockIface>()> clientFactory);
-			TcpConn(const std::string&address, const uint16_t port,
-					std::function<std::shared_ptr<TcpSockIface>()> clientFactory);
+			static void create(const struct InetDest& dest, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory);
+			TcpConn(std::function<std::shared_ptr<TcpStreamIf>()> clientFactory);
 			virtual ~TcpConn();
 			void handleRead();
 			void handleWrite();
 			void handleError();
 			void handleTimer(const size_t timerId);
 		private:
-			std::function<std::shared_ptr<TcpSockIface>()> clientFactory;
+			std::function<std::shared_ptr<TcpStreamIf>()> clientFactory;
+			std::mutex writeLock;
+			SyncVec<Bytes> writeQueue;
 	};
 }

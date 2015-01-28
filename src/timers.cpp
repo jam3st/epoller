@@ -77,7 +77,6 @@ namespace Sb {
 		return timerCount;
 	}
 
-
 	NanoSecs Timers::setTimer(const TimeEvent* what, const size_t timerId, const NanoSecs& timeout) {
 		logDebug("Engine::doSetTimer() BO: " +
 				 intToString(timersByOwner.size()) + " BD: " +

@@ -5,7 +5,7 @@
 
 namespace Sb {
 	void TcpStream::create(const int fd, const InetDest remote,
-						 std::shared_ptr<TcpSockIface> client) {
+						 std::shared_ptr<TcpStreamIf> client) {
 		auto ref = std::make_shared<TcpStream>(fd, remote, client);
 		Engine::add(ref);
 		logDebug("TcpStream::create() my ref " + intToString(ref.use_count()) +
@@ -13,7 +13,7 @@ namespace Sb {
 		client->onConnect(*ref.get(), remote);
 	}
 
-	TcpStream::TcpStream(const int fd, const InetDest remote, std::shared_ptr<TcpSockIface> client) :
+	TcpStream::TcpStream(const int fd, const InetDest remote, std::shared_ptr<TcpStreamIf> client) :
 						Socket(fd),
 						remote(remote),
 						client(client) {
@@ -50,7 +50,7 @@ namespace Sb {
 			if(isEmpty) {
 				logDebug("write queue is empty notifying client");
 				auto ref = this->ref();
-				client->onReadyToWrite(*this);
+				client->onWriteCompleted(*this);
 				return;
 			}
 			doWrite(data);

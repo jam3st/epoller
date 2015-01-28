@@ -5,9 +5,10 @@
 namespace Sb {
 	UdpClient::UdpClient(const std::string& address, const uint16_t port, const Bytes& initialData)
 		: Socket(Socket::createUdpSocket()) {
+		(void) address;
 		logDebug(std::string("UdpClient::UdpClient " + intToString(port)));
 		pErrorThrow(fd);
-		dest = destFromString(address, port);
+//		dest = destFromString(address, port);
 		// todo make async
 		sendDatagram(initialData, dest);
 	}
