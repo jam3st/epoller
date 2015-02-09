@@ -21,7 +21,9 @@ namespace Sb {
 
 	void pErrorThrow(const int error) {
 		if(error < 0) {
-			throw std::runtime_error(::strerror(errno));
+			auto errorText = ::strerror(errno);
+			__builtin_trap();
+			throw std::runtime_error(errorText);
 		}
 	}
 

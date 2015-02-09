@@ -5,9 +5,9 @@
 
 namespace Sb {
 	void TcpStream::create(const int fd, const InetDest remote,
-						 std::shared_ptr<TcpStreamIf> client) {
+						 std::shared_ptr<TcpStreamIf> client, const bool replace) {
 		auto ref = std::make_shared<TcpStream>(fd, remote, client);
-		Engine::add(ref);
+		Engine::add(ref, replace);
 		logDebug("TcpStream::create() my ref " + intToString(ref.use_count()) +
 				 " their refs " + intToString(client.use_count()));
 		client->onConnect(*ref.get(), remote);
@@ -17,6 +17,7 @@ namespace Sb {
 						Socket(fd),
 						remote(remote),
 						client(client) {
+		Socket::makeNonBlocking(fd);
 		logDebug(std::string("TcpStream::TcpStream"));
 	}
 
@@ -50,7 +51,7 @@ namespace Sb {
 			if(isEmpty) {
 				logDebug("write queue is empty notifying client");
 				auto ref = this->ref();
-				client->onWriteCompleted(*this);
+//				client->onWriteCompleted(*this);
 				return;
 			}
 			doWrite(data);
@@ -71,7 +72,8 @@ namespace Sb {
 	}
 
 	void TcpStream::queueWrite(const Bytes& data) {
-//		std::lock_guard<std::mutex> sync(writeLock);
+		logDebug("TcpStream::queueWrite() " + intToString(getFd()));
+		std::lock_guard<std::mutex> sync(writeLock);
 		auto wasEmpty = writeQueue.isEmpty();
 		writeQueue.add(data);
 		if(wasEmpty) {
@@ -101,7 +103,7 @@ namespace Sb {
 
 		decltype(actuallySent) dataLen = data.size();
 		if(actuallySent == dataLen) {
-			logDebug("Write  " + intToString(actuallySent) + " out of " + intToString(dataLen));
+			logDebug("Write " + intToString(actuallySent) + " out of " + intToString(dataLen) + " on " + intToString(getFd()));
 		} else if (actuallySent > 0) {
 			logDebug("Partial write of " + intToString(actuallySent) + " out of " + intToString(dataLen));
 			writeQueue.add(Bytes(data.begin () + actuallySent, data.end ()));

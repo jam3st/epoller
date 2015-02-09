@@ -14,20 +14,20 @@ namespace Sb {
 			};
 		protected:
 			virtual int getFd() const final;
-			virtual int dupFd() const final;
+			virtual int releaseFd() const final;
 		private:
 			friend class Engine;
 			virtual void handleError() = 0;
 			virtual void handleRead() = 0;
 			virtual void handleWrite() = 0;
 		protected:
-			const int fd;
+			mutable int fd;
 		protected:
 			virtual ~Socket();
 			static int createSocket(const SockType type);
 			static int createUdpSocket();
 			static int createTcpSocket();
-			static void makeSocketNonBlocking(const int fd);
+			static void makeNonBlocking(const int fd);
 			void onReadComplete();
 			void onWriteComplete();
 			void reuseAddress() const;

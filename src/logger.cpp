@@ -78,13 +78,13 @@ namespace Sb {
 		tmput.put(os, os, '.', local_time_now, fmt.data(), fmt.data() + fmt.length());
 		os << nsecs;
 		auto start = nsecs == 0 ? static_cast<int64_t>(1) : nsecs;
-		for(auto div = start; div < 100000000; div *= 10) {
+		for(auto div = start; div < 100000000; div = div * 10) {
 			os << "0";
 		}
 
 		lock.lock();
 		std::size_t tid = std::numeric_limits<std::size_t>::max();
-		for(std::size_t i = 0; i < Logger::threadIds.size(); i++) {
+		for(std::size_t i = 0; i < Logger::threadIds.size(); ++i) {
 			if(threadIds.at(i) == std::this_thread::get_id()) {
 				tid = i;
 			}

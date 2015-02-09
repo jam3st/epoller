@@ -91,7 +91,7 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		int initialNumThreadsToSpawn = std::thread::hardware_concurrency() * minWorkersPerCpu + 1;
 
 		logDebug("Starting with " + intToString(initialNumThreadsToSpawn) + " threads");
-		for(int i = 0; i < initialNumThreadsToSpawn; i++) {
+		for(int i = 0; i < initialNumThreadsToSpawn; ++i) {
 			logDebug("Started thread " + intToString(i));
 			slaves.push_back(new Worker(Engine::doWork));
 		}
@@ -183,38 +183,47 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		return it->second;
 	}
 
-	void Engine::doAdd(const std::shared_ptr<Socket>& what) {
+	void Engine::doAdd(const std::shared_ptr<Socket>& what, const bool replace) {
 		std::lock_guard<std::mutex> sync(evHashLock);
-		eventHash.insert(std::make_pair(what.get(), what));
-		epoll_event event = { 0, { 0 } };
-		event.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLRDHUP;
-		event.data.ptr = what.get();
-		pErrorThrow (::epoll_ctl (epollFd, EPOLL_CTL_ADD, what->getFd(), &event));
+		if(!stopped) {
+			eventHash.insert(std::make_pair(what.get(), what));
+			epoll_event event = { 0, { 0 } };
+			event.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLRDHUP;
+			event.data.ptr = what.get();
+			pErrorThrow (::epoll_ctl (epollFd, replace ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, what->getFd(), &event));
+		} else {
+			throw std::runtime_error("Engine is stopped.");
+		}
 	}
 
-	void Engine::add(const std::shared_ptr<Socket>& what) {
+	void Engine::add(const std::shared_ptr<Socket>& what, const bool replace) {
 		if(Engine::theEngine == nullptr) {
 			throw std::runtime_error("Please call Engine::Init() first");
 		}
-		theEngine->doAdd(what);
+		theEngine->doAdd(what, replace);
 	}
 
-	void Engine::doRemove(const Socket* what) {
+	void Engine::doRemove(const Socket* what, const bool replace) {
 		std::lock_guard<std::mutex> sync(evHashLock);
 		epoll_event event = { 0, { 0 } };
 		auto it = eventHash.find(what);
 		auto ptr = it->second;
-		pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_DEL, what->getFd(), &event));
+		if(!replace) {
+			pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_DEL, what->getFd(), &event));
+		}
 		timers.cancelAllTimers(what);
 		eventHash.erase(it);
+		if(eventHash.size() == 0) {
+			Engine::theEngine->stop();
+		}
 	}
 
-	void Engine::remove(const Socket* what)
+	void Engine::remove(const Socket* what, const bool replace)
 	{
 		if(Engine::theEngine == nullptr) {
 			throw std::runtime_error("Please call Engine::Init() first");
 		}
-		theEngine->doRemove(what);
+		theEngine->doRemove(what, replace);
 	}
 
 	void Engine::init() {
@@ -235,10 +244,9 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		if((events & EPOLLIN) != 0) {
 			sock.handleRead();
 		}
-		if((events & EPOLLRDHUP) != 0 || (events & EPOLLERR) != 0) {
+		if((events & EPOLLRDHUP) != 0  || (events & EPOLLHUP) != 0 || (events & EPOLLERR) != 0) {
 			sock.handleError();
-		}
-		if((events & EPOLLOUT) != 0) {
+		} else if((events & EPOLLOUT) != 0) {
 			sock.handleWrite();
 		}
 	}
@@ -304,8 +312,8 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 						pErrorThrow(num);
 					}
 				} else {
-					for(int i = 0; i < num; i++) {
-						logDebug("Added");
+					for(int i = 0; i < num; ++i) {
+						logDebug("Added for " + intToString(static_cast<Socket*>(events[i].data.ptr)->getFd()));
 						eventQueue.add(EpollEvent(static_cast<Socket*>(events[i].data.ptr), events[i].events));
 						sem.signal();
 					}

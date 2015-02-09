@@ -9,6 +9,7 @@ namespace Sb {
 	class TcpStream;
 	class TcpStreamIf {
 		public:
+			virtual void onError() = 0;
 			virtual void onConnect(TcpStream&, const struct InetDest&) = 0;
 			virtual void onReadCompleted(TcpStream&, const Bytes&) = 0;
 			virtual void onWriteCompleted(TcpStream&) = 0;
@@ -18,7 +19,7 @@ namespace Sb {
 
 	class TcpStream : virtual public Socket {
 		public:
-			static void create(const int fd, const struct InetDest remote, std::shared_ptr<TcpStreamIf> client);
+			static void create(const int fd, const struct InetDest remote, std::shared_ptr<TcpStreamIf> client, const bool replace = false);
 			void queueWrite(const Bytes& data);
 			void disconnect();
 			TcpStream(const int fd, const struct InetDest remote,

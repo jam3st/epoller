@@ -14,7 +14,6 @@ namespace Sb {
 	const int64_t NanoSecsInSecs = { 1000000000 };
 	const int numBitsPerByte = 8; // By definition ISO/IEC 9899:TC3
 	const int LISTEN_MAX_PENDING = 1;
-	const size_t APPROX_PAGE_SIZE = 4096;
 
 	typedef std::chrono::nanoseconds NanoSecs;
 	typedef std::chrono::seconds Seconds;

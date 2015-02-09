@@ -2,14 +2,15 @@
 #include <vector>
 #include <mutex>
 #include "utils.hpp"
+#include "resouces.hpp"
 
 namespace Sb {
 	template<typename T>
 	class SyncVec {
 		public:
 			SyncVec() {
-				if(APPROX_PAGE_SIZE > sizeof (SyncVec<T>)) {
-					auto res = (APPROX_PAGE_SIZE - sizeof (SyncVec<T>)) / size;
+				if(Resouces::pageSize() > sizeof (SyncVec<T>)) {
+					auto res = (Resouces::pageSize() - sizeof (SyncVec<T>)) / size;
 					if(res != 0) {
 						vec.reserve (res);
 					}

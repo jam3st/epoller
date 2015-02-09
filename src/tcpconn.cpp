@@ -3,16 +3,16 @@
 #include "types.hpp"
 
 namespace Sb {
-	void TcpConn::create(const struct InetDest& dest, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) {
-		auto ref = std::make_shared<TcpConn>(clientFactory);
+	void TcpConn::create(const struct InetDest& dest, std::shared_ptr<TcpStreamIf> client) {
+		auto ref = std::make_shared<TcpConn>(client);
 		Engine::add(ref);
 		logDebug("TcpConn::create()");
 		ref->connect(dest);
 	}
 
-	TcpConn::TcpConn(std::function<std::shared_ptr<TcpStreamIf>()> clientFactory)
-		:	Socket(fd),
-		  clientFactory(clientFactory) {
+	TcpConn::TcpConn(std::shared_ptr<TcpStreamIf> client)
+		:	Socket(Socket::createTcpSocket()),
+		  client(client) {
 	}
 
 	TcpConn::~TcpConn() {
@@ -20,28 +20,27 @@ namespace Sb {
 	}
 
 	void TcpConn::handleRead() {
-		logDebug("UdpServer::handleRead");
-		Bytes data(MAX_PACKET_SIZE);
-		InetDest from ;
-		const auto actuallyReceived = receiveDatagram(data, from);
-		if(actuallyReceived < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
-			logDebug("UdpServer::handleRead would block");
-			return;
-		}
-		sendDatagram(data, from);
+		logDebug("TcpListener::handleRead");
 	}
 
 	void TcpConn::handleWrite() {
-		logDebug("UdpServer::handleWrite()");
+		logDebug("TcpConn::handleWrite");
+		struct InetDest blah;
+		TcpStream::create(releaseFd(), blah, client, true);
+		Engine::remove(this, true);
+		logDebug("TcpConn::handleWrite()");
 	}
 
 	void TcpConn::handleError() {
 		logDebug("TcpConnector::handleError ");
+		client->onError();
+		Engine::remove(this);
 		// TODO
 	}
 
 	void TcpConn::handleTimer(const size_t timerId) {
-		logDebug("UdpServer::handleTimer " + intToString(timerId));
+		logDebug("TcpConn::handleTimer " + intToString(timerId));
 		// TODO
 	}
+
 }

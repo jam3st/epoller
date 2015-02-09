@@ -6,7 +6,10 @@
 
 namespace Sb {
 	void TcpListener::create(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) {
-		Engine::add(std::make_shared<TcpListener>(port, clientFactory));
+		//Engine::add(std::make_shared<TcpListener>(port, clientFactory));
+		auto tmp = std::make_shared<TcpListener>(port, clientFactory);
+		Engine::add(tmp);
+//		logDebug("TcpListener::create fd "	+ intToString(tmp->getFd()));
 	}
 
 	TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory)
@@ -24,7 +27,7 @@ namespace Sb {
 
 	void TcpListener::handleRead() {
 		logDebug("TcpListener::handleRead");
-		const auto connFd = accept();
+		const int connFd = accept();
 		pErrorLog(connFd);
 		if(connFd < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
 			logDebug("TcpListener::handleRead would block");
@@ -44,7 +47,6 @@ namespace Sb {
 	void TcpListener::handleTimer(const size_t timerId) {
 		logDebug("Epollable::handleTimer() " + intToString(timerId));
 	}
-
 
 	void TcpListener::createStream(const int connFd) {
 		logDebug("TcpListener::createStream " + intToString(connFd));

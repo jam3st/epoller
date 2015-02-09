@@ -21,27 +21,28 @@ namespace Sb {
 	 : fd(fd) {
 		pErrorThrow(fd);
 		logDebug("Socket::Socket()");
-		Socket::makeSocketNonBlocking(fd);
+		Socket::makeNonBlocking(fd);
 	}
 
 	Socket::~Socket() {
 		logDebug("Socket::~Socket() closed and shutdown	" + intToString(fd));
-		::close(fd);
-	}
-
-	int Socket::dupFd() const  {
-		logDebug("Epollable::dupFd");
-		auto dup = ::dup(fd);
-		pErrorThrow(dup);
-		return dup;
+		if(fd > 0) {
+			::close(fd);
+		}
 	}
 
 	int Socket::getFd() const {
 		return fd;
 	}
 
+	int Socket::releaseFd() const {
+		int ret = fd;
+		fd = -1;
+		return ret;
+	}
 
-	void Socket::makeSocketNonBlocking(const int fd) {
+
+	void Socket::makeNonBlocking(const int fd) {
 		auto flags = ::fcntl(fd, F_GETFL, 0);
 		pErrorThrow(flags);
 		flags |= O_NONBLOCK;
@@ -50,7 +51,7 @@ namespace Sb {
 
 	int Socket::createSocket(const Socket::SockType type) {
 		int fd = ::socket(AF_INET6, type == UDP ? SOCK_DGRAM : SOCK_STREAM  | SOCK_NONBLOCK, 0);
-		makeSocketNonBlocking(fd);
+		makeNonBlocking(fd);
 		return fd;
 	}
 
@@ -71,7 +72,7 @@ namespace Sb {
 		logDebug("Asked to read with buffer size of  "  + intToString(data.size ()));
 		int numRead = ::read(fd, &data[0], data.size());
 		pErrorLog(numRead);
-		logDebug("Read "  + intToString(numRead));
+		logDebug("Read "  + intToString(numRead) + " on " + intToString(fd));
 		if(numRead >= 0 && (data.size() - numRead) > 0) {
 			logDebug("Resize "  + intToString(numRead));
 			data.resize(numRead);
@@ -93,10 +94,10 @@ namespace Sb {
 	int	Socket::accept() const {
 		SocketAddress addr;
 		socklen_t addrLen = sizeof addr.addrIn6;
-		auto accepteFd = ::accept(fd, &addr.addr, &addrLen);
+		int aFd = ::accept(fd, &addr.addr, &addrLen);
 		assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
-		logDebug("New connection from "  + inetAddressToString(addr));
-		return accepteFd;
+		logDebug("Accept connection from "  + inetAddressToString(addr) + " on fd " + intToString(aFd));
+		return aFd;
 	}
 
 	int Socket::receiveDatagram(Bytes& data, InetDest& whereFrom) const {
