@@ -48,9 +48,9 @@ namespace Sb {
 		}
 		auto data = writeQueue.front();
 		writeQueueLock.unlock();
-		logDebug(std::string("TlsTcpStream::queueWrite writing " + intToString(data.size())));
+		logDebug(std::string("TlsTcpStream::queueWrite writing " + std::to_string(data.size())));
 		const auto actuallySent = write(data);
-		logDebug(std::string("TlsTcpStream::queueWrite actually wrote " + intToString(actuallySent)));
+		logDebug(std::string("TlsTcpStream::queueWrite actually wrote " + std::to_string(actuallySent)));
 		pErrorLog(getFd());
 		if(actuallySent <= 0 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
 			logDebug(std::string("TlsTcpStream::queueWrite would block"));
@@ -61,7 +61,7 @@ namespace Sb {
 			std::lock_guard<std::mutex> sync(writeQueueLock);
 			writeQueue.pop();
 		} else if (actuallySent > 0) {
-			logDebug("Partial write of " + intToString(actuallySent) + " out of " + intToString(dataLen));
+			logDebug("Partial write of " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen));
 			std::lock_guard<std::mutex> sync(writeQueueLock);
 			std::vector<decltype(data)::value_type>(data.begin() + actuallySent, data.end()). swap(data);
 		}

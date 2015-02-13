@@ -39,7 +39,7 @@ namespace Sb {
 	}
 
 	void TcpConn::handleTimer(const size_t timerId) {
-		logDebug("TcpConn::handleTimer " + intToString(timerId));
+		logDebug("TcpConn::handleTimer " + std::to_string(timerId));
 		// TODO
 	}
 

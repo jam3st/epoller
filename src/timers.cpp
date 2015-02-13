@@ -11,8 +11,8 @@ namespace Sb {
 
 	std::pair<const TimeEvent*, const size_t> Timers::onTimerExpired() {
 		logDebug("doOnTimerExpired() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
+				 std::to_string(timersByOwner.size()) + " BD: " +
+				 std::to_string(timesByDate.size()));
 		std::lock_guard<std::mutex> lock(timeLock);
 		auto ev = timesByDate.begin()->second.ep;
 		auto timerId = timesByDate.begin()->second.id;
@@ -61,16 +61,16 @@ namespace Sb {
 	}
 
 	NanoSecs Timers::cancelTimer(const TimeEvent* what, const size_t timerId) {
-		logDebug("Engine::doCancelTimer() for " + intToString(timerId));
+		logDebug("Engine::doCancelTimer() for " + std::to_string(timerId));
 		logDebug("Engine::doCancelTimer() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
+				 std::to_string(timersByOwner.size()) + " BD: " +
+				 std::to_string(timesByDate.size()));
 		std::lock_guard<std::mutex> sync(timeLock);
 		auto oldStart = timesByDate.begin();
 		auto timerCount = removeTimer(what, timerId) - SteadyClock::now();
 		logDebug("Engine::doCancelTimer() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
+				 std::to_string(timersByOwner.size()) + " BD: " +
+				 std::to_string(timesByDate.size()));
 		if(oldStart != timesByDate.begin()) {
 			setTrigger();
 		}
@@ -79,35 +79,35 @@ namespace Sb {
 
 	NanoSecs Timers::setTimer(const TimeEvent* what, const size_t timerId, const NanoSecs& timeout) {
 		logDebug("Engine::doSetTimer() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
-		logDebug("Timer::doSetTimer() for " + intToString(timerId) + " duration "
-				 + intToString(timeout.count()) + "ns");
+				 std::to_string(timersByOwner.size()) + " BD: " +
+				 std::to_string(timesByDate.size()));
+		logDebug("Timer::doSetTimer() for " + std::to_string(timerId) + " duration "
+				 + std::to_string(timeout.count()) + "ns");
 
 		auto now = SteadyClock::now();
 		TimePointNs when = now + timeout;
 		std::lock_guard<std::mutex> lock(timeLock);
 		auto oldStart = timesByDate.begin();
 		auto timerCount = removeTimer(what, timerId) - SteadyClock::now();
-		logDebug("Togo is " + intToString(timerCount.count()));
+		logDebug("Togo is " + std::to_string(timerCount.count()));
 		logDebug("Engine::doSetTimer() remove  BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
+				 std::to_string(timersByOwner.size()) + " BD: " +
+				 std::to_string(timesByDate.size()));
 		timersByOwner.insert(std::make_pair(what,  TimerDateId { when, timerId }));
 		timesByDate.insert(std::make_pair(when, TimerEpollId { what, timerId }));
 		if(oldStart != timesByDate.begin()) {
 			setTrigger();
 		}
 		logDebug("Engine::doSetTimer() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
+				 std::to_string(timersByOwner.size()) + " BD: " +
+				 std::to_string(timesByDate.size()));
 		return timerCount;
 	}
 
 	void Timers::cancelAllTimers(const TimeEvent* what) {
 		logDebug("Engine::doCancelAllTimers() BO: " +
-				 intToString(timersByOwner.size()) + " BD: " +
-				 intToString(timesByDate.size()));
+				 std::to_string(timersByOwner.size()) + " BD: " +
+				 std::to_string(timesByDate.size()));
 		std::lock_guard<std::mutex> sync(timeLock);
 		auto oldStart = timesByDate.begin();
 		auto iiByOwner = timersByOwner.equal_range(what);
@@ -120,7 +120,7 @@ namespace Sb {
 			setTrigger();
 		}
 		logDebug("Engine::doCancelAllTimers() BO: " +
-				 intToString(timersByOwner.size()) + " BD: "+
-				 intToString(timesByDate.size()));
+				 std::to_string(timersByOwner.size()) + " BD: "+
+				 std::to_string(timesByDate.size()));
 	}
 }

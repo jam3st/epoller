@@ -90,9 +90,9 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 
 		int initialNumThreadsToSpawn = std::thread::hardware_concurrency() * minWorkersPerCpu + 1;
 
-		logDebug("Starting with " + intToString(initialNumThreadsToSpawn) + " threads");
+		logDebug("Starting with " + std::to_string(initialNumThreadsToSpawn) + " threads");
 		for(int i = 0; i < initialNumThreadsToSpawn; ++i) {
-			logDebug("Started thread " + intToString(i));
+			logDebug("Started thread " + std::to_string(i));
 			slaves.push_back(new Worker(Engine::doWork));
 		}
 		doEpoll();
@@ -162,7 +162,7 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 	}
 
 	void Engine::armTimerIn(const NanoSecs& timeout) const	{
-		logDebug("Engine::armTimerIn " + intToString(timeout.count()));
+		logDebug("Engine::armTimerIn " + std::to_string(timeout.count()));
 		itimerspec new_timer;
 		new_timer.it_interval.tv_sec = 0;
 		new_timer.it_interval.tv_nsec = 0;
@@ -287,7 +287,7 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 			Engine::theEngine->stop();
 		}
 		me.exited = true;
-		logDebug("Worker exited " + intToString(me.id));
+		logDebug("Worker exited " + std::to_string(me.id));
 	}
 
 	void Engine::doWork(Worker* me) noexcept {
@@ -300,20 +300,20 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 			while(!stopped) {
 				epoll_event events[EPOLL_EVENTS_PER_RUN];
 				int num = epoll_wait(epollFd, events, EPOLL_EVENTS_PER_RUN, -1);
-				logDebug("doEpoll " + intToString(num));
+				logDebug("doEpoll " + std::to_string(num));
 				if(stopped) {
 					break;
 				}
 				if(num < 0) {
 					if(errno == EINTR || errno == EAGAIN) {
-						logDebug("Epoll errno " + intToString(errno));
+						logDebug("Epoll errno " + std::to_string(errno));
 						continue;
 					} else {
 						pErrorThrow(num);
 					}
 				} else {
 					for(int i = 0; i < num; ++i) {
-						logDebug("Added for " + intToString(static_cast<Socket*>(events[i].data.ptr)->getFd()));
+						logDebug("Added for " + std::to_string(static_cast<Socket*>(events[i].data.ptr)->getFd()));
 						eventQueue.add(EpollEvent(static_cast<Socket*>(events[i].data.ptr), events[i].events));
 						sem.signal();
 					}

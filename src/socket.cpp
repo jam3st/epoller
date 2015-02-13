@@ -20,12 +20,13 @@ namespace Sb {
 	Socket::Socket(const int fd)
 	 : fd(fd) {
 		pErrorThrow(fd);
+		assert(fd > 0, "Unitialised fd");
 		logDebug("Socket::Socket()");
 		Socket::makeNonBlocking(fd);
 	}
 
 	Socket::~Socket() {
-		logDebug("Socket::~Socket() closed and shutdown	" + intToString(fd));
+		logDebug("Socket::~Socket() closed and shutdown	" + std::to_string(fd));
 		if(fd > 0) {
 			::close(fd);
 		}
@@ -40,7 +41,6 @@ namespace Sb {
 		fd = -1;
 		return ret;
 	}
-
 
 	void Socket::makeNonBlocking(const int fd) {
 		auto flags = ::fcntl(fd, F_GETFL, 0);
@@ -69,12 +69,12 @@ namespace Sb {
 	}
 
 	int Socket::read(Bytes& data) const {
-		logDebug("Asked to read with buffer size of  "  + intToString(data.size ()));
+		logDebug("Asked to read with buffer size of  "  + std::to_string(data.size ()));
 		int numRead = ::read(fd, &data[0], data.size());
 		pErrorLog(numRead);
-		logDebug("Read "  + intToString(numRead) + " on " + intToString(fd));
+		logDebug("Read "  + std::to_string(numRead) + " on " + std::to_string(fd));
 		if(numRead >= 0 && (data.size() - numRead) > 0) {
-			logDebug("Resize "  + intToString(numRead));
+			logDebug("Resize "  + std::to_string(numRead));
 			data.resize(numRead);
 		}
 		return numRead;
@@ -96,7 +96,7 @@ namespace Sb {
 		socklen_t addrLen = sizeof addr.addrIn6;
 		int aFd = ::accept(fd, &addr.addr, &addrLen);
 		assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
-		logDebug("Accept connection from "  + inetAddressToString(addr) + " on fd " + intToString(aFd));
+		logDebug("Accept connection from "  + inetAddressToString(addr) + " on fd " + std::to_string(aFd));
 		return aFd;
 	}
 
@@ -108,7 +108,7 @@ namespace Sb {
 		assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
 		::memcpy(&whereFrom.addr, &addr.addrIn6.sin6_addr, sizeof whereFrom.addr);
 		whereFrom.port = ntohs(addr.addrIn6.sin6_port);
-		logDebug("Datagram from: " + inetAddressToString(addr) + " " + intToString(whereFrom.port));
+		logDebug("Datagram from: " + inetAddressToString(addr) + " " + std::to_string(whereFrom.port));
 
 		if(numReceived >= 0 && data.size() - numReceived > 0) {
 			data.resize(numReceived);
@@ -123,7 +123,7 @@ namespace Sb {
 		::memcpy(&addr.addrIn6.sin6_addr, &whereTo.addr, sizeof addr.addrIn6.sin6_addr);
 		const auto numSent = ::sendto(fd, &data[0], data.size(), 0, &addr.addr, sizeof addr.addrIn6);
 		pErrorLog(numSent);
-		logDebug("sent " + intToString(numSent));
+		logDebug("sent " + std::to_string(numSent));
 		return numSent;
 	}
 

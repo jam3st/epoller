@@ -1,7 +1,10 @@
-﻿#include "logger.hpp"
+﻿#include <string>
+
+#include "logger.hpp"
 #include "tcplistener.hpp"
 #include "tcpstream.hpp"
 #include "utils.hpp"
+
 
 
 namespace Sb {
@@ -9,13 +12,13 @@ namespace Sb {
 		//Engine::add(std::make_shared<TcpListener>(port, clientFactory));
 		auto tmp = std::make_shared<TcpListener>(port, clientFactory);
 		Engine::add(tmp);
-//		logDebug("TcpListener::create fd "	+ intToString(tmp->getFd()));
+//		logDebug("TcpListener::create fd "	+ std::to_string(tmp->getFd()));
 	}
 
 	TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory)
 		: Socket(Socket::createTcpSocket()),
 				clientFactory(clientFactory) {
-		logDebug(std::string("TcpListener::TcpListener " + intToString(port)));
+		logDebug(std::string("TcpListener::TcpListener " + std::to_string(port)));
 		reuseAddress();
 		bind(port);
 		listen();
@@ -45,11 +48,11 @@ namespace Sb {
 	}
 
 	void TcpListener::handleTimer(const size_t timerId) {
-		logDebug("Epollable::handleTimer() " + intToString(timerId));
+		logDebug("Epollable::handleTimer() " + std::to_string(timerId));
 	}
 
 	void TcpListener::createStream(const int connFd) {
-		logDebug("TcpListener::createStream " + intToString(connFd));
+		logDebug("TcpListener::createStream " + std::to_string(connFd));
 		if(connFd < 0) {
 			logError("Invalid connection fd in TcpListener::createStream");
 			return;

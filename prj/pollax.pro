@@ -30,7 +30,9 @@ SOURCES += \
 	../src/timers.cpp \
 	../src/timevent.cpp \
 	../src/resouces.cpp \
-    ../src/udpsocket.cpp
+    ../src/udpsocket.cpp \
+    ../src/query.cpp \
+    ../src/clock.cpp
 
 HEADERS += \
 	../src/types.hpp \
@@ -51,4 +53,6 @@ HEADERS += \
 	../src/timeevent.hpp \
 	../src/timers.hpp \
 	../src/resouces.hpp \
-    ../src/udpsocket.hpp
+    ../src/udpsocket.hpp \
+    ../src/query.hpp \
+    ../src/clock.hpp

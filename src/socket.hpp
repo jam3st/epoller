@@ -39,5 +39,7 @@ namespace Sb {
 			int	accept() const;
 			int receiveDatagram(Bytes& data, InetDest& whereFrom) const;
 			int sendDatagram(const Bytes& data, const InetDest& whereTo) const;
+		private:
+			const int LISTEN_MAX_PENDING = 1;
 	};
 }

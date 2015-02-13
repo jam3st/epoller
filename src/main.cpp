@@ -1,6 +1,7 @@
 ﻿#include <iostream>
 #include <functional>
 #include <regex>
+#include <unistd.h>
 
 #include "engine.hpp"
 #include "udpsocket.hpp"
@@ -8,6 +9,7 @@
 #include "udpsocket.hpp"
 #include "tcpconn.hpp"
 #include "logger.hpp"
+#include "query.hpp"
 
 using namespace Sb;
 namespace Sb {
@@ -63,7 +65,7 @@ class TcpEcho : public TcpStreamIf {
 
 		virtual void onTimerExpired(TcpStream& s, int tid) {
 			s.queueWrite( { 'x', 'p', '\n' });
-			logDebug("blah expired " + intToString(tid));
+			logDebug("blah expired " + std::to_string(tid));
 		}
 };
 
@@ -98,7 +100,7 @@ class TcpEchoWithGreeting : public TcpStreamIf {
 		}
 
 		virtual void onTimerExpired(TcpStream& /*s*/, int tid) {
-			logDebug("blah expired " + intToString(tid));
+			logDebug("blah expired " + std::to_string(tid));
 		}
 };
 
@@ -186,7 +188,7 @@ class HttpProxy : public TcpStreamIf {
 			std::smatch m;
 			std::string tmp(header.begin(), header.end());
 			std::regex_search(tmp, m, re);
-			 std::cout << " ECMA (depth first search) match: " << m[0] << '\n';
+			std::cout << " ECMA (depth first search) match: " << m[0] << '\n';
 		}
 
 		virtual void onWriteCompleted( TcpStream&) {
@@ -200,7 +202,7 @@ class HttpProxy : public TcpStreamIf {
 
 		virtual void onTimerExpired(TcpStream& s, int tid) {
 			s.setTimer(5, NanoSecs(1000000000));
-			logDebug("blah expired " + intToString(tid));
+			logDebug("blah expired " + std::to_string(tid));
 		}
 	private:
 		Bytes header;
@@ -212,11 +214,13 @@ class UdpEcho : public UdpSocketIf {
 		}
 		virtual void onConnect(UdpSocket& s, const InetDest& from) override {
 			logDebug("UdpEcho::onConnect");
-			s.queueWrite(Bytes({'e', 'l', 'l', 'o', '\r', '\n'} ), from);
+			auto q = Query::resolve("www.google.com");
+			s.queueWrite(q, from);
 		}
-		virtual void onReadCompleted(UdpSocket& s, const InetDest& from, const Bytes& w) override {
-			logDebug("UdpEcho::onReadCompleted");
-			s.queueWrite(w, from);
+		virtual void onReadCompleted(UdpSocket& /*s*/, const InetDest& /*from*/, const Bytes& w) override {
+			logDebug("UdpEcho::onReadCompleted " + std::to_string(w.size()));
+			Query::decode(w);
+//			s.queueWrite(w, from);
 		}
 		virtual void onWriteCompleted(UdpSocket&) override {
 			logDebug("UdpEcho::onWriteCompleted");
@@ -227,9 +231,11 @@ class UdpEcho : public UdpSocketIf {
 };
 
 int main (const int, const char* const argv[]) {
+	::close(0);
 //	runUnit("connect", [] () { TcpConn::create(Socket::destFromString("::ffff:216.58.220.100", 80), std::make_shared<TcpEchoWithGreeting>()); });
 //	runUnit("udpconn", [] () { UdpSocket::create(Socket::destFromString("::ffff:127.0.0.1", 1223), std::make_shared<UdpEcho>()); });
-	runUnit("udpconn", [] () { UdpSocket::create(1223, std::make_shared<UdpEcho>()); });
+//	runUnit("udpconn", [] () { UdpSocket::create(1223, std::make_shared<UdpEcho>()); });
+	runUnit("udpconn", [] () { UdpSocket::create(Socket::destFromString("::ffff:127.0.0.1", 53), std::make_shared<UdpEcho>()); });
 //	runUnit ("connect", [] () {	TcpListener::create(1025, [] () { return std::make_shared<TcpEchoWithGreeting>(); } ); 	});
 //		TcpConn::create( Socket::destFromString("::1", 1025), std::make_shared<TcpEchoWithGreeting>());
 //		TcpListener::create(1024, [] () { return std::make_shared<HttpProxy>(); } );

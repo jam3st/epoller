@@ -1,6 +1,7 @@
 ﻿#include <sstream>
 #include "logger.hpp"
 #include "utils.hpp"
+#include "clock.hpp"
 
 namespace Sb {
 	Logger* Logger::theLogger = nullptr;
@@ -59,9 +60,7 @@ namespace Sb {
 		if(type > level) {
 			return;
 		}
-		int64_t nowNs = std::chrono::duration_cast<NanoSecs>(
-						 SteadyClock::now().time_since_epoch()).count() +
-					 driftCorrectionInNs;
+		int64_t nowNs = Clock::now();
 		std::time_t secs = nowNs / NanoSecsInSecs;
 		int64_t nsecs = nowNs % NanoSecsInSecs;
 

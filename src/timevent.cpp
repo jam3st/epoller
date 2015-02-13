@@ -14,12 +14,12 @@ namespace Sb {
 
 	void TimeEvent::setTimer(const int timerId, const NanoSecs& timeout) {
 		assert(timeout.count() > 0, " Epoll::setTimer timeout must be > 0");
-		logDebug("setTimer() " + intToString(timerId));
+		logDebug("setTimer() " + std::to_string(timerId));
 		Engine::setTimer(this, timerId, timeout);
 	}
 
 	void TimeEvent::cancelTimer(const int timerId) {
-		logDebug("Epollable::cancelTimer() " + intToString(timerId));
+		logDebug("Epollable::cancelTimer() " + std::to_string(timerId));
 		Engine::cancelTimer(this, timerId);
 	}
 	std::shared_ptr<TimeEvent> TimeEvent::ref() {

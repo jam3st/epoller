@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include <cstdint>
 #include <memory>
-#include "utils.hpp"
+#include "clock.hpp"
 
 namespace Sb {
 	class TimeEvent : public std::enable_shared_from_this<TimeEvent> {

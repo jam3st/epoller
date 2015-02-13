@@ -1,5 +1,5 @@
 ﻿#include "stats.hpp"
-
+#include <string>
 
 namespace Sb {
 	template<typename T, typename U>
@@ -37,7 +37,7 @@ namespace Sb {
 
 		if(busyTime < NanoSecs(0)) {
 			logWarn("Please check clocks. Possible correction as busytime is "
-					 + intToString(busyTime.count())
+					 + std::to_string(busyTime.count())
 					 +"ns");
 		}
 		return busyTime;

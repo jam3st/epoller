@@ -7,11 +7,6 @@
 #include "logger.hpp"
 
 namespace Sb {
-	int64_t driftCorrectionInNs = std::chrono::duration_cast<NanoSecs>(
-									  std::chrono::system_clock::now().time_since_epoch() -
-									  std::chrono::steady_clock::now().time_since_epoch()
-									  ).count();
-
 	void assert(bool ok, const std::string error) {
 		if(!ok) {
 			logError(std::string("Assertion failed: ") + error);

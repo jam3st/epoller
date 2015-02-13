@@ -22,7 +22,7 @@ namespace Sb {
 	UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf> client)
 		: Socket(Socket::createUdpSocket()),
 		  client(client) {
-		logDebug(std::string("UdpClient::UdpClient " + intToString(fd)));
+		logDebug(std::string("UdpClient::UdpClient " + std::to_string(fd)));
 		pErrorThrow(fd);
 		Socket::makeNonBlocking(fd);
 	}

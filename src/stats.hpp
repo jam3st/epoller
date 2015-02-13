@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "utils.hpp"
+#include "clock.hpp"
 
 namespace Sb {
 	class Stats final {

@@ -8,7 +8,7 @@
 //        client([&](const Botan::byte data[], size_t len) { stream.queueWrite(Bytes(data, data + len)); },
 //               [&](const Botan::byte data[], size_t len) { stream.onRead(Bytes(data, data + len)); },
 //               [] (Botan::TLS::Alert alert, const Botan::byte[], size_t) {
-//                    logDebug("Alert " + intToString(alert.type()));
+//                    logDebug("Alert " + std::to_string(alert.type()));
 //               },
 //               [] (const Botan::TLS::Session& session)  -> bool  { logDebug("handshake compete"); (void)session; return false; },
 //               sessionManager,
@@ -19,7 +19,7 @@
 
 //    std::function<ssize_t(const Bytes&)> TlsClientWrapper::getCb(){
 //        return [&] (const Bytes& data) {
-//            logDebug("Running callback TlsClientWrapper::getCb with " + intToString(data.size()));
+//            logDebug("Running callback TlsClientWrapper::getCb with " + std::to_string(data.size()));
 //            return client.received_data(&data[0], data.size());
 //        };
 //    }
