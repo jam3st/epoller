@@ -11,6 +11,7 @@
 #include "syncvec.hpp"
 #include "timeevent.hpp"
 #include "stats.hpp"
+#include "resolver.hpp"
 
 namespace Sb {
 	class Engine final {
@@ -20,6 +21,7 @@ namespace Sb {
 		static void init();
 		static void add(const std::shared_ptr<Socket>& what, const bool replace = false);
 		static void remove(const Socket* what, const bool replace = false);
+		static Resolver& resolver();
 		static void setTimer(const TimeEvent* owner, const size_t timerId, const NanoSecs& timeout);
 		static NanoSecs cancelTimer(TimeEvent* owner, const size_t timerId);
 
@@ -32,10 +34,9 @@ namespace Sb {
 					: thread(func, this) {
 				}
 				~Worker();
-				Stats stats;
-				size_t id;
-				bool exited = false;
 				std::thread thread;
+				std::atomic_bool exited;
+				Stats stats;
 		};
 	private:
 		Engine();
@@ -82,6 +83,7 @@ namespace Sb {
 		std::vector<Worker*> slaves;
 		std::unordered_map<const TimeEvent *, std::shared_ptr<TimeEvent>> eventHash;
 		std::mutex evHashLock;
+		Resolver theResolver;
 		Timers timers;
 	private:
 		const NanoSecs SHUTDOWN_WAIT_CHECK_NSECS = NanoSecs(10000000);

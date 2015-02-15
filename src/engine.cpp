@@ -232,6 +232,13 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 		}
 	}
 
+	Resolver& Engine::resolver() {
+		if(Engine::theEngine == nullptr) {
+			throw std::runtime_error("Please call Engine::Init() first");
+		}
+		return Engine::theEngine->theResolver;
+	}
+
 	void Engine::doStop() {
 		stopped = true;
 		if(epollTid != std::this_thread::get_id()) {
@@ -253,7 +260,6 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 
 
 	void Engine::worker(Worker& me) {
-		logDebug("Worker started");
 		try {
 			while(!stopped) {
 				me.stats.MarkIdleStart();
@@ -287,7 +293,6 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 			Engine::theEngine->stop();
 		}
 		me.exited = true;
-		logDebug("Worker exited " + std::to_string(me.id));
 	}
 
 	void Engine::doWork(Worker* me) noexcept {

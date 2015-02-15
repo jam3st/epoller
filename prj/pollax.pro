@@ -8,7 +8,7 @@ PKGCONFIG += botan
 
 INCLUDEPATH += ../src
 LIBS += -pthread
-QMAKE_CXXFLAGS += --std=c++14 -Wall -Werror -ggdb -g3
+QMAKE_CXXFLAGS += --std=c++14 -Wall -Werror -ggdb -g3 -O0
 
 
 
@@ -30,9 +30,11 @@ SOURCES += \
 	../src/timers.cpp \
 	../src/timevent.cpp \
 	../src/resouces.cpp \
-    ../src/udpsocket.cpp \
-    ../src/query.cpp \
-    ../src/clock.cpp
+	../src/udpsocket.cpp \
+	../src/query.cpp \
+	../src/clock.cpp \
+    ../src/resolverimpl.cpp \
+    ../src/resolver.cpp
 
 HEADERS += \
 	../src/types.hpp \
@@ -53,6 +55,8 @@ HEADERS += \
 	../src/timeevent.hpp \
 	../src/timers.hpp \
 	../src/resouces.hpp \
-    ../src/udpsocket.hpp \
-    ../src/query.hpp \
-    ../src/clock.hpp
+	../src/udpsocket.hpp \
+	../src/query.hpp \
+	../src/clock.hpp \
+    ../src/resolver.hpp \
+    ../src/resolverimpl.hpp

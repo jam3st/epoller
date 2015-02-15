@@ -19,7 +19,7 @@ namespace Sb {
 			return U16Swap { 0xb000 }.b[0] == 0xb0;
 		};
 
-		enum class Qtype : uint16_t {
+		enum struct Qtype : uint16_t {
 			A = 1,
 			Ns = 2,
 			Cname = 5,
@@ -43,7 +43,7 @@ namespace Sb {
 			bool rd : 1;
 			bool tc : 1;
 			bool aa : 1;
-			enum class opcode {
+			enum struct opcode {
 				Query = 0,
 				Iquery = 1,
 				Status = 2
@@ -68,7 +68,7 @@ namespace Sb {
 			uint16_t arcount;
 		};
 
-		enum class Qclass : uint8_t {
+		enum struct Qclass : uint8_t {
 			Internet = 1
 		};
 
@@ -284,17 +284,11 @@ namespace Sb {
 				(void)name;
 				(void)f;
 			}
-std::cerr << "pos " <<	curPos << std::endl;
 			for(size_t i = header.h.ancount; i > 0; --i) {
 				auto name = decodeName(data, curPos);
-std::cerr << "pos " <<	curPos << std::endl;
 				Answer answer = decodeAnswer(data, curPos);
-std::cerr << "pos " <<	curPos << std::endl;
 				reply.ttl = NanoSecs(answer.ttl * NanoSecsInSecs);
 				reply.timeStamp = SteadyClock::now();
-std::cerr << "TTL LEN " <<	answer.ttl << std::endl;
-std::cerr << "RD LEN " <<	answer.rdlength << std::endl;
-std::cerr << "IP ADDRESS IS " << swapper(data[curPos], data[curPos + 1], data[curPos + 2], data[curPos + 3]) << std::endl;
 				if(answer.qclass == Qclass::Internet && answer.qtype == Qtype::A) {
 					if(answer.rdlength == 4) {
 						std::cerr << "IP ADDRESS IS " << swapper(data[curPos], data[curPos + 1], data[curPos + 2], data[curPos + 3]) << std::endl;
