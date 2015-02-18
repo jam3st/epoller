@@ -16,7 +16,8 @@ namespace Sb {
 	TcpStream::TcpStream(const int fd, const InetDest remote, std::shared_ptr<TcpStreamIf> client) :
 						Socket(fd),
 						remote(remote),
-						client(client) {
+						client(client),
+						writeQueue({}) {
 		Socket::makeNonBlocking(fd);
 		logDebug(std::string("TcpStream::TcpStream"));
 	}

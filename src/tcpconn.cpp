@@ -11,8 +11,9 @@ namespace Sb {
 	}
 
 	TcpConn::TcpConn(std::shared_ptr<TcpStreamIf> client)
-		:	Socket(Socket::createTcpSocket()),
-		  client(client) {
+		: Socket(Socket::createTcpSocket()),
+		  client(client),
+		  writeQueue({}) {
 	}
 
 	TcpConn::~TcpConn() {

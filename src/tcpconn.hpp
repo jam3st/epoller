@@ -14,7 +14,7 @@ namespace Sb {
 			virtual void handleRead() override;
 			virtual void handleWrite() override;
 			virtual void handleError() override;
-			virtual void handleTimer(const size_t timerId);
+			virtual void handleTimer(const size_t timerId) override;
 		private:
 			std::shared_ptr<TcpStreamIf> client;
 			std::mutex writeLock;

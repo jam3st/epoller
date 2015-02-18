@@ -17,7 +17,6 @@ namespace Sb {
 	void pErrorThrow(const int error) {
 		if(error < 0) {
 			auto errorText = ::strerror(errno);
-			__builtin_trap();
 			throw std::runtime_error(errorText);
 		}
 	}

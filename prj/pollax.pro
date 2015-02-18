@@ -8,8 +8,12 @@ PKGCONFIG += botan
 
 INCLUDEPATH += ../src
 LIBS += -pthread
-QMAKE_CXXFLAGS += --std=c++14 -Wall -Werror -ggdb -g3 -O0
+QMAKE_CXXFLAGS_DEBUG = -ggdb -g3 -O0
+QMAKE_CXXFLAGS_RELEASE = -flto -O3
+QMAKE_CXXFLAGS = -pipe --std=c++14 -Wall -Werror -fvisibility=hidden
 
+QMAKE_LFLAGS_DEBUG += -ggdb -g3 -O0
+QMAKE_LFLAGS_RELEASE += -flto -O3 -s
 
 
 SOURCES += \
@@ -33,8 +37,8 @@ SOURCES += \
 	../src/udpsocket.cpp \
 	../src/query.cpp \
 	../src/clock.cpp \
-    ../src/resolverimpl.cpp \
-    ../src/resolver.cpp
+	../src/resolverimpl.cpp \
+	../src/resolver.cpp
 
 HEADERS += \
 	../src/types.hpp \
@@ -58,5 +62,5 @@ HEADERS += \
 	../src/udpsocket.hpp \
 	../src/query.hpp \
 	../src/clock.hpp \
-    ../src/resolver.hpp \
-    ../src/resolverimpl.hpp
+	../src/resolver.hpp \
+	../src/resolverimpl.hpp

@@ -29,9 +29,9 @@ namespace Sb {
 					size_t id;
 			};
 		private:
-			std::multimap<const TimePointNs, TimerEpollId> timesByDate;
-			std::multimap<const TimeEvent*, TimerDateId> timersByOwner;
+			std::multimap<TimePointNs, const TimerEpollId> timesByDate;
+			std::multimap<const TimeEvent*, const TimerDateId> timersByOwner;
 			std::mutex timeLock;
-			std::atomic<NanoSecs>trigger;
+			std::atomic<NanoSecs> trigger;
 	};
 }

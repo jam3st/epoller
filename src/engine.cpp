@@ -19,7 +19,8 @@ namespace Sb {
 	}
 
 	Engine::Engine()
-		: stopped(false),
+		: eventQueue(EpollEvent(nullptr, 0)),
+		  stopped(false),
 		  epollTid(std::this_thread::get_id()),
 		  epollHandle(::pthread_self()),
 		  epollFd(::epoll_create(23423)),

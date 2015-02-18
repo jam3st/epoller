@@ -75,12 +75,11 @@ namespace Sb {
 		std::ostream os(&line);
 		std::string fmt("%Y-%Om-%Od %OH:%OM:%OS.");
 		tmput.put(os, os, '.', local_time_now, fmt.data(), fmt.data() + fmt.length());
-		os << nsecs;
 		auto start = nsecs == 0 ? static_cast<int64_t>(1) : nsecs;
 		for(auto div = start; div < 100000000; div = div * 10) {
 			os << "0";
 		}
-
+		os << nsecs;
 		lock.lock();
 		std::size_t tid = std::numeric_limits<std::size_t>::max();
 		for(std::size_t i = 0; i < Logger::threadIds.size(); ++i) {

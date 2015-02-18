@@ -8,7 +8,8 @@ namespace Sb {
 	template<typename T>
 	class SyncVec {
 		public:
-			SyncVec() {
+			SyncVec(const T& sentinel)
+				: sentinel(sentinel) {
 				if(Resouces::pageSize() > sizeof (SyncVec<T>)) {
 					auto res = (Resouces::pageSize() - sizeof (SyncVec<T>)) / size;
 					if(res != 0) {
@@ -48,7 +49,7 @@ namespace Sb {
 				std::lock_guard<std::mutex> sync(lock);
 				isEmpty = isEmptyUnlocked();
 				if(isEmpty) {
-					return *((T *) nullptr);
+					return sentinel;
 				}
 				return vec[start++];
 			}
@@ -74,6 +75,7 @@ namespace Sb {
 			std::vector<T> vec;
 			size_t start = 0;
 			static const size_t size;
+			const T sentinel;
 	};
 
 	template<typename T>

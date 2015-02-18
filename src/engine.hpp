@@ -81,7 +81,7 @@ namespace Sb {
 		int timerFd	= -1;
 
 		std::vector<Worker*> slaves;
-		std::unordered_map<const TimeEvent *, std::shared_ptr<TimeEvent>> eventHash;
+		std::unordered_map<const TimeEvent *, const std::shared_ptr<TimeEvent>> eventHash;
 		std::mutex evHashLock;
 		Resolver theResolver;
 		Timers timers;
