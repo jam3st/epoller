@@ -5,7 +5,7 @@
 namespace Sb {
 	class Stats final {
 	public:
-		Stats();
+		explicit Stats();
 		void MarkIdleStart();
 		void MarkIdleEnd();
 		void Notify(int num);

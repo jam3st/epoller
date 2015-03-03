@@ -10,6 +10,7 @@ namespace Sb {
 	void assert(bool ok, const std::string error) {
 		if(!ok) {
 			logError(std::string("Assertion failed: ") + error);
+__builtin_trap();
 			throw std::runtime_error(error);
 		}
 	}

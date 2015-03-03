@@ -1,5 +1,5 @@
 CXX           = clang++
-CFLAGS        = -pipe -Wall -Werror -fvisibility=hidden -O0 -g -fprofile-instr-generate -fcoverage-mapping
+CFLAGS        = -pipe -Wall -Werror -fvisibility=hidden -O0 -g -fprofile-instr-generate #-fcoverage-mapping
 CXXFLAGS      = $(CFLAGS) -std=c++14 -fexceptions -pthread
 INCPATH       = -I../src `pkg-config --cflags botan`
 LINK          = $(CXX)

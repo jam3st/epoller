@@ -1,12 +1,10 @@
-﻿#include <netinet/in.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+﻿#include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
 #include "socket.hpp"
 #include "logger.hpp"
+#include "endians.hpp"
 
 
 namespace Sb {
@@ -26,7 +24,7 @@ namespace Sb {
 	}
 
 	Socket::~Socket() {
-		logDebug("Socket::~Socket() closed and shutdown	" + std::to_string(fd));
+		logDebug("Socket::~Socket() closed and shutdown " + std::to_string(fd));
 		if(fd > 0) {
 			::close(fd);
 		}
@@ -86,7 +84,6 @@ namespace Sb {
 		return numWritten;
 	}
 
-
 	void Socket::listen() const {
 		pErrorThrow(::listen(fd, LISTEN_MAX_PENDING));
 	}
@@ -107,7 +104,7 @@ namespace Sb {
 		pErrorLog(numReceived);
 		assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
 		::memcpy(&whereFrom.addr, &addr.addrIn6.sin6_addr, sizeof whereFrom.addr);
-		whereFrom.port = ntohs(addr.addrIn6.sin6_port);
+		whereFrom.port = swapEndian(addr.addrIn6.sin6_port);
 		logDebug("Datagram from: " + inetAddressToString(addr) + " " + std::to_string(whereFrom.port));
 
 		if(numReceived >= 0 && data.size() - numReceived > 0) {
@@ -119,7 +116,7 @@ namespace Sb {
 	int Socket::sendDatagram(const Bytes& data, const InetDest& whereTo) const {
 		SocketAddress addr;
 		addr.addrIn6.sin6_family = AF_INET6;
-		addr.addrIn6.sin6_port = htons(whereTo.port);
+		addr.addrIn6.sin6_port = swapEndian(whereTo.port);
 		::memcpy(&addr.addrIn6.sin6_addr, &whereTo.addr, sizeof addr.addrIn6.sin6_addr);
 		const auto numSent = ::sendto(fd, &data[0], data.size(), 0, &addr.addr, sizeof addr.addrIn6);
 		pErrorLog(numSent);
@@ -128,19 +125,22 @@ namespace Sb {
 	}
 
 	void Socket::bind(const uint16_t port) const {
+		makeNonBlocking(fd);
 		SocketAddress addr;
 		addr.addrIn6.sin6_family = AF_INET6;
-		addr.addrIn6.sin6_port = htons(port);
+		addr.addrIn6.sin6_port = swapEndian(port);
 		addr.addrIn6.sin6_addr = IN6ADDR_ANY_INIT;
 		pErrorThrow(::bind(fd, &addr.addr, sizeof addr.addrIn6));
 	}
 
 	void Socket::connect(const InetDest& whereTo) const {
+		makeNonBlocking(fd);
 		SocketAddress addr;
 		addr.addrIn6.sin6_family = AF_INET6;
-		addr.addrIn6.sin6_port = htons(whereTo.port);
+		addr.addrIn6.sin6_port = swapEndian(whereTo.port);
 		::memcpy(&addr.addrIn6.sin6_addr, &whereTo.addr, sizeof addr.addrIn6.sin6_addr);
 		::connect(fd, &addr.addr, sizeof addr.addrIn6);
+		logDebug("Connect to "  + inetAddressToString(addr) + " on fd " + std::to_string(fd));
 	}
 
 	InetDest Socket::destFromString(const std::string& where, const uint16_t port) {

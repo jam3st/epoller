@@ -7,14 +7,22 @@
 
 namespace Sb {
 	class TcpStream;
-	class TcpStreamIf {
+	class TcpStreamIf : public std::enable_shared_from_this<TcpStreamIf> {
 		public:
-			virtual void onError() = 0;
-			virtual void onConnect(TcpStream&, const struct InetDest&) = 0;
-			virtual void onReadCompleted(TcpStream&, const Bytes&) = 0;
-			virtual void onWriteCompleted(TcpStream&) = 0;
-			virtual void onDisconnect(TcpStream&) = 0;
-			virtual void onTimerExpired(TcpStream&, int) = 0;
+			virtual void connected(std::shared_ptr<TcpStream> stream, const struct InetDest&) = 0;
+			virtual void received(const Bytes&) = 0;
+			virtual void writeComplete() = 0;
+			virtual void disconnected() = 0;
+			virtual void timeout(const size_t timerId) = 0;
+
+			std::shared_ptr<TcpStreamIf> ref() {
+				 return shared_from_this();
+			}
+			std::shared_ptr<TcpStream>& getStream() {
+				return stream;
+			}
+
+			std::shared_ptr<TcpStream> stream;
 	};
 
 	class TcpStream : virtual public Socket {
@@ -22,8 +30,7 @@ namespace Sb {
 			static void create(const int fd, const struct InetDest remote, std::shared_ptr<TcpStreamIf> client, const bool replace = false);
 			void queueWrite(const Bytes& data);
 			void disconnect();
-			TcpStream(const int fd, const struct InetDest remote,
-					  std::shared_ptr<TcpStreamIf> client);
+			TcpStream(const int fd, const struct InetDest remote, std::shared_ptr<TcpStreamIf>& client);
 			virtual ~TcpStream();
 
 		protected:

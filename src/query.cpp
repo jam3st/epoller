@@ -1,42 +1,11 @@
 ﻿#include "query.hpp"
+#include "endians.hpp"
+#include "logger.hpp"
 #include <iostream>
 
 namespace Sb {
 	namespace {
-		const size_t MAX_DOMAIN_LEN = 64;
-
-		union U16Swap {
-			uint16_t d16;
-			uint8_t b[sizeof(d16)];
-		};
-
-		union U32Swap {
-			uint32_t d32;
-			uint8_t b[sizeof(d32)];
-		};
-
-		const bool bigEndian = [] () {
-			return U16Swap { 0xb000 }.b[0] == 0xb0;
-		};
-
-		enum struct Qtype : uint16_t {
-			A = 1,
-			Ns = 2,
-			Cname = 5,
-			Soa = 6,
-			Ptr = 12,
-			Mx = 15,
-			Txt = 16,
-			Aaaa = 28,
-			Srv = 33,
-			Ds = 43,
-			Rrsig  = 46,
-			Dnskey = 48,
-			Nsec3 =	50,
-			Nsec3Param = 51,
-			Tlsa = 52,
-			Any = 255
-		};
+		constexpr size_t MAX_DOMAIN_LEN = 64;
 
 		struct Header final {
 			uint16_t id;
@@ -73,12 +42,12 @@ namespace Sb {
 		};
 
 		struct Footer final {
-			Qtype qtype;
+			Query::Qtype qtype;
 			Qclass qclass;
 		};
 
 		struct Answer final {
-			Qtype qtype;
+			Query::Qtype qtype;
 			Qclass qclass;
 			uint32_t ttl;
 			uint16_t rdlength;
@@ -114,74 +83,12 @@ namespace Sb {
 			return len;
 		}
 
-		inline
-		uint16_t
-		swapper(const uint8_t d0, const uint8_t d1) {
-			U16Swap tmp {};
-			if(bigEndian) {
-				tmp.b[1] = d0;
-				tmp.b[0] = d1;
-			} else {
-				tmp.b[0] = d0;
-				tmp.b[1] = d1;
-			}
-			return tmp.d16;
-		}
-
-		inline
-		void
-		swapper(const uint16_t d, std::vector<uint8_t>& stream) {
-			const U16Swap tmp { d };
-			if(bigEndian) {
-				stream.push_back(tmp.b[1]);
-				stream.push_back(tmp.b[0]);
-			} else {
-				stream.push_back(tmp.b[0]);
-				stream.push_back(tmp.b[1]);
-			}
-		}
-
-		inline
-		uint32_t
-		swapper(const uint8_t d0, const uint8_t d1 ,const uint8_t d2, const uint8_t d3) {
-			U32Swap tmp {};
-			if(bigEndian) {
-				tmp.b[3] = d0;
-				tmp.b[2] = d1;
-				tmp.b[1] = d2;
-				tmp.b[0] = d3;
-			} else {
-				tmp.b[0] = d0;
-				tmp.b[1] = d1;
-				tmp.b[2] = d2;
-				tmp.b[3] = d3;
-			}
-			return tmp.d32;
-		}
-
-//		inline
-//		void
-//		swapper(const uint16_t d, std::vector<uint8_t>& stream) {
-//			const U32Swap tmp { d };
-//			if(bigEndian) {
-//				stream.push_back(tmp.b[3]);
-//				stream.push_back(tmp.b[2]);
-//				stream.push_back(tmp.b[1]);
-//				stream.push_back(tmp.b[0]);
-//			} else {
-//				stream.push_back(tmp.b[0]);
-//				stream.push_back(tmp.b[1]);
-//				stream.push_back(tmp.b[2]);
-//				stream.push_back(tmp.b[3]);
-//			}
-//		}
-
 		Footer
 		decodeFooter(const std::vector<uint8_t>& response, size_t& curPos) {
 			Footer footer {};
-			footer.qtype = static_cast<Qtype>(swapper(response[curPos], response[curPos + 1]));
+			footer.qtype = static_cast<Query::Qtype>(swapEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
-			footer.qclass = static_cast<Qclass>(swapper(response[curPos], response[curPos + 1]));
+			footer.qclass = static_cast<Qclass>(swapEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
 			return footer;
 		}
@@ -189,14 +96,15 @@ namespace Sb {
 		Answer
 		decodeAnswer(const std::vector<uint8_t>& response, size_t& curPos) {
 			Answer answer {};
-			answer.qtype = static_cast<Qtype>(swapper(response[curPos], response[curPos + 1]));
+			answer.qtype = static_cast<Query::Qtype>(swapEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
-			answer.qclass = static_cast<Qclass>(swapper(response[curPos], response[curPos + 1]));
+			answer.qclass = static_cast<Qclass>(swapEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
-			answer.ttl = swapper(response[curPos], response[curPos + 1], response[curPos + 2], response[curPos + 3]);
+			answer.ttl = swapEndian(response[curPos], response[curPos + 1], response[curPos + 2], response[curPos + 3]);
 			curPos = curPos + 4;
-			answer.rdlength =  swapper(response[curPos], response[curPos + 1]);
+			answer.rdlength =  swapEndian(response[curPos], response[curPos + 1]);
 			curPos = curPos + 2;
+std::cerr << "ANWER " << (int)answer.qclass	<< " type " << (int)answer.qtype << " rdlen " << answer.rdlength << std::endl;
 			return answer;
 		}
 
@@ -205,7 +113,7 @@ namespace Sb {
 			QueryHeader header {};
 			if(data.size() >= sizeof(header)) {
 				for(size_t i = 0; i < sizeof(header) / sizeof(header.d[0]); ++i) {
-					header.d[i] = swapper(data[i * 2], data[i * 2 + 1]);
+					header.d[i] = swapEndian(data[i * 2], data[i * 2 + 1]);
 				}
 			}
 			return header;
@@ -235,39 +143,48 @@ namespace Sb {
 
 		std::string
 		decodeName(const std::vector<uint8_t>& response, size_t& curPos) {
+			std::string name;
+			size_t len = response[curPos++];
+std::cerr << " len " << len << std::endl;
 			while(response[curPos] != '\0') {
-				if((response[curPos] & 0xC0) == 0xC0) {
-					curPos++;
+				if((len & 0xC0) == 0xC0) {
 					break;
+				}
+				if(len == 0) {
+					name.push_back('.');
+					len = response[curPos];
+				} else {
+					name.push_back(response[curPos]);
+					len--;
 				}
 				curPos++;
 			}
 			curPos++;
-			return "blah";
+			std::cerr << "name is " <<  name << std::endl;
+			return name;
 		}
 	}
 
-	namespace Query {
-
+	namespace Query  {
 		std::vector<uint8_t>
-		resolve(const std::string& name) {
+		resolve(uint16_t reqNo, const std::string& name, Qtype qType)  {
 			QueryHeader header {};
-			header.h.id = 0x3412;
+			header.h.id = reqNo;
 			header.h.qr = Header::qr::Query;
 			header.h.opcode = Header::opcode::Query;
 			header.h.rd = true;
 			header.h.qdcount = 1;
 			QueryFooter footer {};
 			footer.f.qclass = Qclass::Internet;
-			footer.f.qtype = Qtype::A;
+			footer.f.qtype = qType;
 			std::vector<uint8_t> query {};
 			query.reserve(sizeof(header) + sizeof(footer) + 2 * name.length());
 			for(size_t i = 0; i < sizeof(header) / sizeof(header.d[0]); ++i) {
-				swapper(header.d[i], query);
+				swapEndian(header.d[i], query);
 			}
 			encodeName(name, query);
 			for(size_t i = 0; i < sizeof(footer) / sizeof(footer.d[0]); ++i) {
-				swapper(footer.d[i], query);
+				swapEndian(footer.d[i], query);
 			}
 			return query;
 		}
@@ -275,23 +192,47 @@ namespace Sb {
 		Qanswer
 		decode(const std::vector<uint8_t>& data) {
 			Qanswer reply;
+			reply.valid = false;
 			reply.timeStamp = SteadyClock::now();
 			QueryHeader header = decodeHeader(data);
 			auto curPos = sizeof(header);
+			reply.reqNo = header.h.id;
 			for(size_t i = header.h.qdcount; i > 0; --i) {
-				auto name = decodeName(data, curPos);
+				reply.name = decodeName(data, curPos);
 				Footer f = decodeFooter(data, curPos);
-				(void)name;
+std::cerr << "Reply: " << std::to_string(i) << std::endl;
 				(void)f;
 			}
+	std::cerr << "Counts: " << std::to_string(header.h.arcount) << std::endl;
 			for(size_t i = header.h.ancount; i > 0; --i) {
-				auto name = decodeName(data, curPos);
+				(void)decodeName(data, curPos);
 				Answer answer = decodeAnswer(data, curPos);
 				reply.ttl = NanoSecs(answer.ttl * NanoSecsInSecs);
+std::cerr << "Reply: " << std::to_string(i) << std::endl;
+std::cerr << reply.name << " TTL " << reply.ttl.count() << " CLASS " << std::to_string((int)answer.qclass) << std::endl;
 				reply.timeStamp = SteadyClock::now();
-				if(answer.qclass == Qclass::Internet && answer.qtype == Qtype::A) {
-					if(answer.rdlength == 4) {
-						std::cerr << "IP ADDRESS IS " << swapper(data[curPos], data[curPos + 1], data[curPos + 2], data[curPos + 3]) << std::endl;
+				if(answer.qclass == Qclass::Internet) {
+					if(answer.rdlength == 4 && answer.qtype == Qtype::A) {
+						const int prefixLen = 12;
+						std::array<uint8_t, prefixLen> ip4Pref { {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff} };
+						IpAddr addr;
+						size_t i = 0;
+						while(i < prefixLen) {
+							addr[i] = ip4Pref[i];
+							++i;
+						}
+						addr[i] = data[curPos];
+						addr[i + 1] = data[curPos + 1];
+						addr[i + 2] = data[curPos + 2];
+						addr[i + 3] = data[curPos + 3];
+						reply.addr.push_back(addr);
+InetDest dest { addr, 12444 };
+logDebug("resolved added " + dest.toString());
+
+						reply.valid = true;
+					} else if(answer.rdlength == 16 && answer.qtype == Qtype::Aaaa) {
+						std::cerr << "IP6 ADDRESS IS " << swapEndian(data[curPos], data[curPos + 1], data[curPos + 2], data[curPos + 3]) << std::endl;
+						reply.valid = true;
 					}
 				}
 			}

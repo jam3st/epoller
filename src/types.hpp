@@ -1,17 +1,31 @@
 ﻿#pragma once
 #include <string>
 #include <vector>
-#include <atomic>
+#include <array>
+#include <iomanip>
+#include <sstream>
 
 namespace Sb {
 	typedef uint8_t byte;
 	typedef std::vector<byte> Bytes;
-	const ssize_t MAX_PACKET_SIZE = 4096;
-	const ssize_t IP_ADDRESS_SIZE = 128 / 8;
+	typedef std::array<uint8_t, 128 / 8>  IpAddr;
+	constexpr ssize_t MAX_PACKET_SIZE = 4096;
+
 
 	struct InetDest {
-		uint8_t	addr[IP_ADDRESS_SIZE];
+		IpAddr addr;
 		uint16_t port;
+		std::string toString() const {
+			std::stringstream stream;
+//			bool addrZero = true;
+			for(size_t i = 0; i < sizeof(addr); i = i + 2) {
+				stream << std::hex << std::setfill ('0') << std::setw(2) << static_cast<size_t>(addr[i])
+					   << std::hex << std::setfill ('0') << std::setw(2) << static_cast<size_t>(addr[i + 1]) << ':';
+			}
+			stream << std::setw(-1) << std::dec << port;
+			return stream.str();
+		}
+
 	};
 
 }

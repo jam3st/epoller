@@ -18,6 +18,7 @@ namespace Sb {
 			static void create(const uint16_t localPort, std::shared_ptr<UdpSocketIf> client);
 			static void create(const InetDest& dest, std::shared_ptr<UdpSocketIf> client);
 			void queueWrite(const Bytes& data, const InetDest& dest);
+			void disconnect();
 			virtual ~UdpSocket();
 			void handleRead();
 			void handleWrite();

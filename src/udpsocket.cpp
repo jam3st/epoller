@@ -28,7 +28,7 @@ namespace Sb {
 	}
 
 	UdpSocket::~UdpSocket() {
-		logDebug("UdpSocket::~UdpSocket()");
+		logDebug("UdpSocket::~UdpSocket() " + std::to_string(fd));
 	}
 
 	void UdpSocket::handleRead() {
@@ -45,6 +45,12 @@ namespace Sb {
 
 	void UdpSocket::queueWrite(const Bytes& data, const InetDest& dest) {
 		sendDatagram(data, dest);
+	}
+
+	void UdpSocket::disconnect() {
+		logDebug("UdpSocket::disconnect() my ref " + std::to_string(this->ref().use_count()) +
+				 " their refs " + std::to_string(client.use_count()));
+		Engine::remove(this);
 	}
 
 	void UdpSocket::handleWrite() {
