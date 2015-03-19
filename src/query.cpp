@@ -9,20 +9,7 @@ namespace Sb {
 
 		struct Header final {
 			uint16_t id;
-			bool rd : 1;
-			bool tc : 1;
-			bool aa : 1;
-			enum struct opcode {
-				Query = 0,
-				Iquery = 1,
-				Status = 2
-			} opcode  : 4 ;
-			enum class qr {
-				Query = 0,
-				Response = 1
-			} qr : 1;
-			bool ra : 1;
-			uint8_t z :	3;
+
 			enum class rcode {
 				Ok = 0,
 				FormatError = 1,
@@ -31,13 +18,34 @@ namespace Sb {
 				NotImplement = 4,
 				Refused = 5
 			} rcode  : 4 ;
+			bool cd : 1;
+			bool ad : 1;
+			uint8_t z :	1;
+			bool ra : 1;
+
+			bool rd : 1;
+			bool tc : 1;
+			bool aa : 1;
+
+			enum struct opcode {
+				Query = 0,
+				Iquery = 1,
+				Status = 2
+			} opcode  : 4 ;
+
+			enum class qr {
+				Query = 0,
+				Response = 1
+			} qr : 1;
+
+
 			uint16_t qdcount;
 			uint16_t ancount;
 			uint16_t nscount;
 			uint16_t arcount;
 		};
 
-		enum struct Qclass : uint8_t {
+		enum struct Qclass : uint16_t {
 			Internet = 1
 		};
 
@@ -86,9 +94,9 @@ namespace Sb {
 		Footer
 		decodeFooter(const std::vector<uint8_t>& response, size_t& curPos) {
 			Footer footer {};
-			footer.qtype = static_cast<Query::Qtype>(swapEndian(response[curPos], response[curPos + 1]));
+			footer.qtype = static_cast<Query::Qtype>(networkEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
-			footer.qclass = static_cast<Qclass>(swapEndian(response[curPos], response[curPos + 1]));
+			footer.qclass = static_cast<Qclass>(networkEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
 			return footer;
 		}
@@ -96,13 +104,13 @@ namespace Sb {
 		Answer
 		decodeAnswer(const std::vector<uint8_t>& response, size_t& curPos) {
 			Answer answer {};
-			answer.qtype = static_cast<Query::Qtype>(swapEndian(response[curPos], response[curPos + 1]));
+			answer.qtype = static_cast<Query::Qtype>(networkEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
-			answer.qclass = static_cast<Qclass>(swapEndian(response[curPos], response[curPos + 1]));
+			answer.qclass = static_cast<Qclass>(networkEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
-			answer.ttl = swapEndian(response[curPos], response[curPos + 1], response[curPos + 2], response[curPos + 3]);
+			answer.ttl = networkEndian(response[curPos], response[curPos + 1], response[curPos + 2], response[curPos + 3]);
 			curPos = curPos + 4;
-			answer.rdlength =  swapEndian(response[curPos], response[curPos + 1]);
+			answer.rdlength =  networkEndian(response[curPos], response[curPos + 1]);
 			curPos = curPos + 2;
 std::cerr << "ANWER " << (int)answer.qclass	<< " type " << (int)answer.qtype << " rdlen " << answer.rdlength << std::endl;
 			return answer;
@@ -113,7 +121,7 @@ std::cerr << "ANWER " << (int)answer.qclass	<< " type " << (int)answer.qtype << 
 			QueryHeader header {};
 			if(data.size() >= sizeof(header)) {
 				for(size_t i = 0; i < sizeof(header) / sizeof(header.d[0]); ++i) {
-					header.d[i] = swapEndian(data[i * 2], data[i * 2 + 1]);
+					header.d[i] = networkEndian(data[i * 2], data[i * 2 + 1]);
 				}
 			}
 			return header;
@@ -145,7 +153,6 @@ std::cerr << "ANWER " << (int)answer.qclass	<< " type " << (int)answer.qtype << 
 		decodeName(const std::vector<uint8_t>& response, size_t& curPos) {
 			std::string name;
 			size_t len = response[curPos++];
-std::cerr << " len " << len << std::endl;
 			while(response[curPos] != '\0') {
 				if((len & 0xC0) == 0xC0) {
 					break;
@@ -160,7 +167,7 @@ std::cerr << " len " << len << std::endl;
 				curPos++;
 			}
 			curPos++;
-			std::cerr << "name is " <<  name << std::endl;
+std::cerr << "name is " <<  name << std::endl;
 			return name;
 		}
 	}
@@ -172,7 +179,9 @@ std::cerr << " len " << len << std::endl;
 			header.h.id = reqNo;
 			header.h.qr = Header::qr::Query;
 			header.h.opcode = Header::opcode::Query;
+			header.h.tc = false;
 			header.h.rd = true;
+			header.h.aa = false;
 			header.h.qdcount = 1;
 			QueryFooter footer {};
 			footer.f.qclass = Qclass::Internet;
@@ -180,11 +189,11 @@ std::cerr << " len " << len << std::endl;
 			std::vector<uint8_t> query {};
 			query.reserve(sizeof(header) + sizeof(footer) + 2 * name.length());
 			for(size_t i = 0; i < sizeof(header) / sizeof(header.d[0]); ++i) {
-				swapEndian(header.d[i], query);
+				networkEndian(header.d[i], query);
 			}
 			encodeName(name, query);
 			for(size_t i = 0; i < sizeof(footer) / sizeof(footer.d[0]); ++i) {
-				swapEndian(footer.d[i], query);
+				networkEndian(footer.d[i], query);
 			}
 			return query;
 		}
@@ -200,16 +209,13 @@ std::cerr << " len " << len << std::endl;
 			for(size_t i = header.h.qdcount; i > 0; --i) {
 				reply.name = decodeName(data, curPos);
 				Footer f = decodeFooter(data, curPos);
-std::cerr << "Reply: " << std::to_string(i) << std::endl;
 				(void)f;
 			}
-	std::cerr << "Counts: " << std::to_string(header.h.arcount) << std::endl;
 			for(size_t i = header.h.ancount; i > 0; --i) {
 				(void)decodeName(data, curPos);
 				Answer answer = decodeAnswer(data, curPos);
 				reply.ttl = NanoSecs(answer.ttl * NanoSecsInSecs);
 std::cerr << "Reply: " << std::to_string(i) << std::endl;
-std::cerr << reply.name << " TTL " << reply.ttl.count() << " CLASS " << std::to_string((int)answer.qclass) << std::endl;
 				reply.timeStamp = SteadyClock::now();
 				if(answer.qclass == Qclass::Internet) {
 					if(answer.rdlength == 4 && answer.qtype == Qtype::A) {
@@ -231,7 +237,7 @@ logDebug("resolved added " + dest.toString());
 
 						reply.valid = true;
 					} else if(answer.rdlength == 16 && answer.qtype == Qtype::Aaaa) {
-						std::cerr << "IP6 ADDRESS IS " << swapEndian(data[curPos], data[curPos + 1], data[curPos + 2], data[curPos + 3]) << std::endl;
+						std::cerr << "IP6 ADDRESS IS " << networkEndian(data[curPos], data[curPos + 1], data[curPos + 2], data[curPos + 3]) << std::endl;
 						reply.valid = true;
 					}
 				}

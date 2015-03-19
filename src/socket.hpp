@@ -37,8 +37,8 @@ namespace Sb {
 			void connect(const InetDest& whereTo) const;
 			void listen() const;
 			int	accept() const;
-			int receiveDatagram(Bytes& data, InetDest& whereFrom) const;
-			int sendDatagram(const Bytes& data, const InetDest& whereTo) const;
+			int receiveDatagram(InetDest& whereFrom, Bytes& data) const;
+			int sendDatagram(const InetDest& whereTo, const Bytes& data) const;
 		private:
 			const int LISTEN_MAX_PENDING = 1;
 	};

@@ -93,7 +93,8 @@ namespace Sb {
 			Resolver theResolver;
 			Timers timers;
 		private:
-			const int MAX_SHUTDOWN_ATTEMPTS = 5;
-			const int EPOLL_EVENTS_PER_RUN = 4;
+			const std::size_t NUM_ENGINE_EVENTS = 1;
+			const std::size_t MAX_SHUTDOWN_ATTEMPTS = 5;
+			const std::size_t EPOLL_EVENTS_PER_RUN = 4;
 	};
 }

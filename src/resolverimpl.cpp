@@ -31,31 +31,35 @@ namespace Sb {
 				: handler(handler),
 				  requestNo(requestNo),
 				  name(name),
-				  timeout(timeout),
+				  queryTimeout(timeout),
 				  qType(qType) {
 			}
 
-			virtual void onError() override {
-				logDebug("UdpResolver::onError");
+			virtual void disconnected() override {
+				logDebug("UdpResolver::disconnected");
 			}
 
-			virtual void onConnect(UdpSocket& s, const InetDest& to) override {
-				logDebug("UdpResolver::onConnect " + name);
-				s.setTimer(0, timeout);
-				s.queueWrite(Query::resolve(requestNo, name, qType), to);
+			virtual void connected(const InetDest& to) override {
+				logDebug("UdpResolver::connected " + to.toString());
+				auto sock = socket();
+				sock->setTimer(0, queryTimeout);
+				sock->queueWrite(to, Query::resolve(requestNo, name, qType));
 			}
 
-			virtual void onReadCompleted(UdpSocket& s, const InetDest& /*from*/, const Bytes& w) override {
-				logDebug("UdpEcho::onReadCompleted " + std::to_string(w.size()));
+			virtual void received(const InetDest& from, const Bytes& w) override {
+				logDebug("UdpEcho::received " + from.toString() + " " + std::to_string(w.size()));
 				handler.requestComplete(requestNo, Query::decode(w));
-				s.disconnect();
+				socket()->disconnect();
 			}
 
-			virtual void onWriteCompleted(UdpSocket&) override {
+			virtual void notSent(const InetDest& to, const Bytes& w) override {
+				logDebug("UdpEcho::notSent " + to.toString() + " " + std::to_string(w.size()));
+			}
+			virtual void writeComplete() override {
 				logDebug("UdpEcho::onWriteCompleted");
 			}
 
-			virtual void onTimerExpired(UdpSocket&, int) override {
+			virtual void timeout(const size_t) override {
 				logDebug("UdpEcho::onTimerExpired");
 			}
 
@@ -63,7 +67,7 @@ namespace Sb {
 			QueryHandlerIf& handler;
 			const uint16_t requestNo;
 			const std::string name;
-			const NanoSecs timeout;
+			const NanoSecs queryTimeout;
 			const Query::Qtype qType;
 	};
 

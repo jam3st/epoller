@@ -10,7 +10,8 @@ namespace Sb {
 		Engine::add(ref, replace);
 		logDebug("TcpStream::create() my ref " + std::to_string(ref.use_count()) +
 				 " their refs " + std::to_string(client.use_count()) + " "  + std::to_string(fd));
-		client->connected(ref, remote);
+		client->tcpStream = ref;
+		client->connected(remote);
 	}
 
 	TcpStream::TcpStream(const int fd, const InetDest remote, std::shared_ptr<TcpStreamIf>& client) :
@@ -36,6 +37,7 @@ namespace Sb {
 				return;
 			}
 			if(actuallyRead == -1 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
+				logDebug(std::string("TcpStream::handleRead would block"));
 				return;
 			}
 			auto ref = this->ref();
@@ -63,12 +65,12 @@ namespace Sb {
 		logDebug("TcpStream::handleError() " + std::to_string(writeQueue.len()));
 		auto ref = this->ref();
 		client->disconnected();
+		disconnect();
 	}
 
 	void TcpStream::disconnect() {
-		(void)remote;
 		logDebug("TcpStream::disconnect() my ref " + std::to_string(this->ref().use_count()) +
-				 " their refs " + std::to_string(client.use_count()) + " " +  std::to_string(fd));
+				 " their refs " + std::to_string(client.use_count()) + " " + remote.toString() + " " +  std::to_string(fd));
 		Engine::remove(this);
 	}
 
@@ -94,7 +96,7 @@ namespace Sb {
 		pErrorLog(getFd());
 		if(actuallySent == -1 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
 			logDebug(std::string("TcpStream::queueWrite would block"));
-			writeQueue.add (data);
+			writeQueue.add(data);
 			return;
 		}
 		if(actuallySent < 0) {
@@ -110,5 +112,4 @@ namespace Sb {
 			writeQueue.add(Bytes(data.begin () + actuallySent, data.end ()));
 		}
 	}
-
 }

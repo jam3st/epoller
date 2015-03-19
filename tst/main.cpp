@@ -20,7 +20,7 @@ void runUnit(const std::string id, std::function<void()>what) {
 	try {
 		Engine::init();
 		what();
-		Engine::start(0);
+		Engine::start(1);
 	} catch(const std::exception& e) {
 		   std::cerr << e.what() << "\n";
 	} catch ( ... ) {
@@ -28,83 +28,6 @@ void runUnit(const std::string id, std::function<void()>what) {
 	}
 }
 
-
-class TcpEcho : public TcpStreamIf {
-	public:
-		TcpEcho() {}
-		virtual ~TcpEcho() {
-			logDebug("~TcpEcho destroyed");
-		}
-
-		virtual void onError() override {
-
-		}
-
-		virtual void onConnect(TcpStream& s, const struct InetDest& ) override {
-			logDebug("TcpEcho onConnect");
-			Engine::stop();
-			Bytes greeting = stringToBytes("Ello\n");
-			s.queueWrite(greeting);
-//			s.disconnect();
-		}
-
-		virtual void onReadCompleted( TcpStream& s, const Bytes& w) override {
-			logDebug("TcpEcho onReadCompleted");
-			s.queueWrite(w);
-//			s.disconnect();
-		}
-
-		virtual void onWriteCompleted( TcpStream&) override {
-			logDebug("TcpEcho onReadyToWrite");
-		}
-
-		virtual void onDisconnect(TcpStream& /*s*/) override {
-			logDebug("TcpEcho onDisconnect");
-//			s.disconnect();
-		}
-
-		virtual void onTimerExpired(TcpStream& s, int tid) override {
-			s.queueWrite( { 'x', 'p', '\n' });
-			logDebug("blah expired " + std::to_string(tid));
-		}
-};
-
-class TcpEchoWithGreeting : public TcpStreamIf {
-	public:
-		TcpEchoWithGreeting() {}
-		virtual void onError() override {
-			logDebug("~TcpEchoWithGreeting onError");
-		}
-
-		virtual ~TcpEchoWithGreeting() {
-			logDebug("~TcpEchoWithGreeting destroyed");
-		}
-
-		virtual void onConnect(TcpStream& s, const struct InetDest& ) override {
-			logDebug("TcpEcho onConnect");
-			Bytes greeting = stringToBytes("get http://127.0.0.1/\r\n\r\n");
-			s.queueWrite(greeting);
-//			s.setTimer(5, NanoSecs(1000000000));
-		}
-
-		virtual void onReadCompleted(TcpStream& s, const Bytes& d) override {
-			logDebug("TcpEcho onReadCompleted");
-			s.queueWrite(d);
-		}
-
-		virtual void onWriteCompleted( TcpStream&) override {
-			logDebug("TcpEcho onReadyToWrite");
-		}
-
-		virtual void onDisconnect( TcpStream& s) override {
-			logDebug("TcpEcho onDisconnect");
-			s.disconnect();
-		}
-
-		virtual void onTimerExpired(TcpStream& /*s*/, int tid) override {
-			logDebug("blah expired " + std::to_string(tid));
-		}
-};
 
 std::pair<const Bytes::iterator, const Bytes::iterator>
 findFirstPattern(const Bytes::iterator begin, const Bytes::iterator end, const Bytes& pattern) {
@@ -123,25 +46,75 @@ findFirstPattern(const Bytes::iterator begin, const Bytes::iterator end, const B
 	return std::make_pair(end,end);
 }
 
+class Remote : public TcpStreamIf {
+	public:
+		Remote(const std::shared_ptr<TcpStream>& xxx, Bytes& initWrite)
+			:ep(xxx),
+			 initWrite(initWrite) {
+if(xxx == nullptr) {
+	__builtin_trap();
+}
+		}
+		virtual ~Remote() {
+			logDebug("~Remote destroyed");
+		}
+
+		virtual void connected(std::shared_ptr<TcpStream> str, const struct InetDest& dest) override {
+			stream = str;
+			logDebug("Remote onConnect " + dest.toString());
+			str->queueWrite(initWrite);
+		}
+
+		virtual void received(const Bytes& x) override {
+			logDebug("Remote received");
+			ep->queueWrite(x);
+		}
+
+		virtual void writeComplete() override {
+			logDebug("Remote onReadyToWrite");
+		}
+
+		virtual void disconnected() override {
+			logDebug("Remote onDisconnect");
+			stream = nullptr;
+		}
+
+		virtual void timeout(const size_t /*timerId*/) override {
+//			s.setTimer(5, NanoSecs(1000000000));
+			logDebug("blah expired");
+		}
+	private:
+		std::shared_ptr<TcpStream> ep;
+		const Bytes& initWrite;
+};
+
 class HttpProxy : public TcpStreamIf {
 	public:
-		HttpProxy() {}
+		HttpProxy()	 {
+			stream.reset();
+		}
+
 		virtual ~HttpProxy() {
-			logDebug("~TcpEchoWithGreeting destroyed");
-		}
-		virtual void onError() override {
+			logDebug("~HttpProxy destroyed");
 		}
 
-		virtual void onConnect(TcpStream& s, const struct InetDest& ) override {
-			logDebug("TcpEcho onConnect");
-			s.setTimer(0, NanoSecs(300000000000));
-			s.setTimer(5, NanoSecs(10000000000));
-			s.setTimer(5, NanoSecs(10000000000));
-			s.setTimer(5, NanoSecs(10000000000));
+		virtual void connected(std::shared_ptr<TcpStream> str, const struct InetDest& dest) override {
+			logDebug("HttpProxy onConnect " + dest.toString());
+			stream = str;
+//			s.setTimer(0, NanoSecs(300000000000));
+//			s.setTimer(5, NanoSecs(10000000000));
+//			s.setTimer(5, NanoSecs(10000000000));
+//			s.setTimer(5, NanoSecs(10000000000));
 		}
 
-		virtual void onReadCompleted( TcpStream& , const Bytes& x) override {
-			logDebug("TcpEcho onReadCompleted");
+		virtual void received(const Bytes& x) override {
+			logDebug("HttpProxy onReadCompleted");
+			if(ep.get() != nullptr) {
+				logDebug("HttpProxy onReadCompleted to stream");
+				ep->getStream()-> queueWrite(x);
+				return;
+			}
+			std::cerr << std::string(x.begin(), x.end());
 			header.insert(header.end(), x.begin(), x.end());
 
 			bool doubleCr = false;
@@ -170,6 +143,7 @@ class HttpProxy : public TcpStreamIf {
 				return;
 			}
 			auto crPos = header.end();
+			std::string host;
 			for(auto start = header.begin(); start != header.end(); start = crPos + 1) {
 				while(*start == '\n') {
 					++start;
@@ -177,93 +151,64 @@ class HttpProxy : public TcpStreamIf {
 				crPos = std::find(start, header.end(), '\r');
 								Bytes getPost(start, crPos);
 				logDebug("line: " + std::string{getPost.begin(), getPost.end() } );
-				auto host = findFirstPattern(getPost.begin(), getPost.end(), { 'H', 'o', 's', 't', ':', '?'});
-				if(host.first != host.second) {
-					logDebug("host: " + std::string{host.second + 1, getPost.end()} );
+				auto it = findFirstPattern(getPost.begin(), getPost.end(), { 'H', 'O', 'S', 'T', ':', '?'});
+				if(it.first != it.second) {
+					host = std::string{it.second + 1, getPost.end()};
+					logDebug("host: " +  host );
 				}
 
 				if(crPos == header.end()) {
 					break;
 				}
 			}
-			std::regex re("GET.*");
-			std::smatch m;
-			std::string tmp(header.begin(), header.end());
-			std::regex_search(tmp, m, re);
-			std::cout << " ECMA (depth first search) match: " << m[0] << '\n';
+			uint16_t port = 80;
+			auto it = findFirstPattern(header.begin(), header.end(), { 'C', 'O', 'N', 'N', 'E', 'C', 'T', ' ' });
+			if(it.first != it.second) {
+				header.resize(0);
+				port = 443;
+			}
+
+			std::cout << " ************************** host " << host  << " " << port << "**************************" << std::endl;
+			ep =  std::make_shared<Remote>(stream, header);
+			TcpConnection::create(host, port, ep);
 		}
 
-		virtual void onWriteCompleted( TcpStream&) override {
-			logDebug("TcpEcho onReadyToWrite");
+		virtual void writeComplete() override {
+			logDebug("HttpProxy onReadyToWrite");
 		}
 
-		virtual void onDisconnect( TcpStream& s) override {
-			logDebug("TcpEcho onDisconnect");
-			s.disconnect();
+		virtual void disconnected() override {
+			logDebug("HttpProxy onDisconnect");
+			stream.reset();
+			ep.reset();
 		}
 
-		virtual void onTimerExpired(TcpStream& s, int tid) override {
-			s.setTimer(5, NanoSecs(1000000000));
-			logDebug("blah expired " + std::to_string(tid));
+		virtual void timeout(const size_t /*timerId*/) override {
+//			s.setTimer(5, NanoSecs(1000000000));
+			logDebug("blah expired");
 		}
 	private:
 		Bytes header;
+		std::shared_ptr<TcpStreamIf> ep;
 };
 
-class UdpEcho : public UdpSocketIf {
-		virtual void onError() override {
-			logDebug("UdpEcho::onError");
+class ResolveNameSy : public ResolverIf {
+	public:
+		virtual void error() override {
+			logDebug("ResolveNameSy	error");
 		}
-		virtual void onConnect(UdpSocket& s, const InetDest& from) override {
-			logDebug("UdpEcho::onConnect");
-			auto q = Query::resolve("www.google.com");
-			s.queueWrite(q, from);
-		}
-		virtual void onReadCompleted(UdpSocket& /*s*/, const InetDest& /*from*/, const Bytes& w) override {
-			logDebug("UdpEcho::onReadCompleted " + std::to_string(w.size()));
-			Query::decode(w);
-//			s.queueWrite(w, from);
-		}
-		virtual void onWriteCompleted(UdpSocket&) override {
-			logDebug("UdpEcho::onWriteCompleted");
-		}
-		virtual void onTimerExpired(UdpSocket&, int) override {
-			logDebug("UdpEcho::onTimerExpired");
+		virtual void resolved(const IpAddr& /*addr*/) override {
+			logDebug("ResolveNameSy	ok");
 		}
 };
 
 int main (const int, const char* const argv[]) {
 	::close(0);
-//	runUnit("connect", [] () { TcpConn::create(Socket::destFromString("::ffff:216.58.220.100", 80), std::make_shared<TcpEchoWithGreeting>()); });
-	runUnit("udpconn", [] () { UdpSocket::create(Socket::destFromString("::ffff:127.0.0.1", 1223), std::make_shared<UdpEcho>()); });
-//	runUnit("udpconn", [] () { UdpSocket::create(1223, std::make_shared<UdpEcho>()); });
-//	runUnit("udpconn", [] () { UdpSocket::create(Socket::destFromString("::ffff:127.0.0.1", 53), std::make_shared<UdpEcho>()); });
-//	runUnit ("tcpechotest", [] () {
-//		TcpListener::create(1025, [] () { return std::make_shared<TcpEchoWithGreeting>(); } );
-//		TcpConn::create(Socket::destFromString("::ffff:127.0.0.1", 1025), std::make_shared<TcpEchoWithGreeting>()); });
-//		TcpConn::create( Socket::destFromString("::1", 1025), std::make_shared<TcpEchoWithGreeting>());
-//		TcpListener::create(1024, [] () { return std::make_shared<HttpProxy>(); } );
-//		TcpConn::create(Socket::destFromString("::ffff:216.58.220.100", 80), std::make_shared<TcpEchoWithGreeting>());
-
-
-
-//		;(new UdpServer(1025))->start();
-//		(new TcpConnector("127.0.0.1", 1025))->start ();
-//        (new UdpServer(1025))->start();
-//		(new TcpListener(1025	))->start ();
-//		(new TcpConnector("127.0.0.1", 1025))->start ();
-//		(new TcpConnector("::1", 1025))->start();
-//		(new UdpServer(1025))->start ();
-//		(new UdpClient("127.0.0.1", 1025, { 'T', 'E', 'S', 'T', '\n'}))->start ();
-//		(new UdpClient("::1", 1025, { 'T', 'E', 'S', 'T', '\n'}))->start();
-//		(new TcpConnector("2404:6800:4003:c02::93", 443))->start();
-//        (new TcpConnector("::1", 4040))->start();
-
+	runUnit("resolve", [] () { Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "www.google.com.au", Resolver::AddrPref::Ipv4Only); });
 	std::cerr << argv[0] << " exited." << std::endl;
-
 	return 0;
 }
 
-void operator  delete(void* /*ptr*/, std::size_t /*sz*/) noexcept {
+//void operator  delete(void* /*ptr*/, std::size_t /*sz*/) noexcept {
 //	__builtin_trap();
-}
+//}

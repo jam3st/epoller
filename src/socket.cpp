@@ -97,14 +97,14 @@ namespace Sb {
 		return aFd;
 	}
 
-	int Socket::receiveDatagram(Bytes& data, InetDest& whereFrom) const {
+	int Socket::receiveDatagram(InetDest& whereFrom, Bytes& data) const {
 		SocketAddress addr;
 		socklen_t addrLen = sizeof addr.addrIn6;
 		const auto numReceived = ::recvfrom(fd, &data[0], data.size(), 0, &addr.addr, &addrLen);
 		pErrorLog(numReceived);
 		assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
 		::memcpy(&whereFrom.addr, &addr.addrIn6.sin6_addr, sizeof whereFrom.addr);
-		whereFrom.port = swapEndian(addr.addrIn6.sin6_port);
+		whereFrom.port = networkEndian(addr.addrIn6.sin6_port);
 		logDebug("Datagram from: " + inetAddressToString(addr) + " " + std::to_string(whereFrom.port));
 
 		if(numReceived >= 0 && data.size() - numReceived > 0) {
@@ -113,10 +113,10 @@ namespace Sb {
 		return numReceived;
 	}
 
-	int Socket::sendDatagram(const Bytes& data, const InetDest& whereTo) const {
+	int Socket::sendDatagram(const InetDest& whereTo, const Bytes& data) const {
 		SocketAddress addr;
 		addr.addrIn6.sin6_family = AF_INET6;
-		addr.addrIn6.sin6_port = swapEndian(whereTo.port);
+		addr.addrIn6.sin6_port = networkEndian(whereTo.port);
 		::memcpy(&addr.addrIn6.sin6_addr, &whereTo.addr, sizeof addr.addrIn6.sin6_addr);
 		const auto numSent = ::sendto(fd, &data[0], data.size(), 0, &addr.addr, sizeof addr.addrIn6);
 		pErrorLog(numSent);
@@ -128,7 +128,7 @@ namespace Sb {
 		makeNonBlocking(fd);
 		SocketAddress addr;
 		addr.addrIn6.sin6_family = AF_INET6;
-		addr.addrIn6.sin6_port = swapEndian(port);
+		addr.addrIn6.sin6_port = networkEndian(port);
 		addr.addrIn6.sin6_addr = IN6ADDR_ANY_INIT;
 		pErrorThrow(::bind(fd, &addr.addr, sizeof addr.addrIn6));
 	}
@@ -137,7 +137,7 @@ namespace Sb {
 		makeNonBlocking(fd);
 		SocketAddress addr;
 		addr.addrIn6.sin6_family = AF_INET6;
-		addr.addrIn6.sin6_port = swapEndian(whereTo.port);
+		addr.addrIn6.sin6_port = networkEndian(whereTo.port);
 		::memcpy(&addr.addrIn6.sin6_addr, &whereTo.addr, sizeof addr.addrIn6.sin6_addr);
 		::connect(fd, &addr.addr, sizeof addr.addrIn6);
 		logDebug("Connect to "  + inetAddressToString(addr) + " on fd " + std::to_string(fd));

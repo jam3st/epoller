@@ -28,7 +28,7 @@ namespace Sb {
 
 			void add(const T& src) {
 				std::lock_guard<std::mutex> sync(lock);
-				vec.push_back (src);
+				vec.push_back(src);
 			}
 
 			const T& addAndRemove(const T& src) {
@@ -36,7 +36,7 @@ namespace Sb {
 				if(isEmptyUnlocked()) {
 					return src;
 				}
-				vec.push_back (src);
+				vec.push_back(src);
 				return vec[start++];
 			}
 

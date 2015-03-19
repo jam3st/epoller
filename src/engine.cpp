@@ -124,7 +124,7 @@ logDebug("stoped works");
 
 	void
 	Engine::doInit(int minWorkersPerCpu) {
-		assert(theEngine != nullptr, "Need to Add() something before Go().");
+		assert(eventHash.size() > NUM_ENGINE_EVENTS, "Need to Add() something before Go().");
 		startWorkers(minWorkersPerCpu);
 		doEpoll();
 		stopWorkers();
@@ -196,8 +196,8 @@ logDebug("stoped works");
 		new_timer.it_interval.tv_nsec = 0;
 		new_timer.it_value.tv_sec = timeout.count() / NanoSecsInSecs;
 		new_timer.it_value.tv_nsec = timeout.count() % NanoSecsInSecs;
-	//	itimerspec old_timer;
-	//	pErrorThrow(::timerfd_settime(timerFd, 0, &new_timer, &old_timer));
+		itimerspec old_timer;
+		pErrorThrow(::timerfd_settime(timerFd, 0, &new_timer, &old_timer));
 	}
 
 	std::shared_ptr<TimeEvent>
@@ -244,7 +244,7 @@ logDebug("stoped works");
 		auto ptr = it->second;
 		timers.cancelAllTimers(what);
 		eventHash.erase(it);
-		if(eventHash.size() == 0) {
+		if(eventHash.size() == NUM_ENGINE_EVENTS) {
 			Engine::theEngine->stop();
 		}
 	}
@@ -285,7 +285,7 @@ logDebug("stoped works");
 		}
 		timers.cancelAllTimers(what);
 		eventHash.erase(it);
-		if(eventHash.size() == 0) {
+		if(eventHash.size() == NUM_ENGINE_EVENTS) {
 			Engine::theEngine->stop();
 		}
 	}
@@ -323,11 +323,10 @@ logDebug("stoped works");
 	void
 	Engine::run(Socket& sock, const uint32_t events) const {
 		logDebug("Engine::Run " + pollEventsToString(events) + " " + std::to_string(sock.getFd()));
-		if((events & EPOLLIN) != 0) {
-			sock.handleRead();
-		}
 		if((events & EPOLLRDHUP) != 0  || (events & EPOLLHUP) != 0 || (events & EPOLLERR) != 0) {
 			sock.handleError();
+		} else if((events & EPOLLIN) != 0) {
+			sock.handleRead();
 		} else if((events & EPOLLOUT) != 0) {
 			sock.handleWrite();
 		}

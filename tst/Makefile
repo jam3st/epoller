@@ -1,6 +1,6 @@
 CXX           = clang++
-CFLAGS        = -pipe -Wall -Werror -fvisibility=hidden -O0 -g -fprofile-instr-generate #-fcoverage-mapping
-CXXFLAGS      = $(CFLAGS) -std=c++14 -fexceptions -pthread
+CFLAGS        = -pipe -Wall -Werror -fvisibility=hidden -fvisibility-inlines-hidden -fstandalone-debug -fintegrated-as  -gdwarf-4 -g3 -O0 -fprofile-instr-generate -fcoverage-mapping -finstrument-functions
+CXXFLAGS      = $(CFLAGS) -std=c++14 -pthread
 INCPATH       = -I../src `pkg-config --cflags botan`
 LINK          = $(CXX)
 LFLAGS        = $(CXXFLAGS)
@@ -27,7 +27,7 @@ SB_HDRS = \
 		timeevent.hpp timers.hpp tlsclientwrapper.hpp tlscredentials.hpp tlstcpstream.hpp types.hpp \
 		udpsocket.hpp utils.hpp
 
-TEST_EXE    = sbtest
+TEST_EXE      = sbtest
 TEST_OBJS     = ${TEST_SRCS:%.cpp=$(TEST_OBJS_DIR)/%.o} 
 SB_OBJS       = ${SB_SRCS:%.cpp=$(TEST_OBJS_DIR)/%.o}
 COV_OUTS      = ${SB_SRCS:%=$(RESULTS_DIR)/%.cov} ${SB_HDRS:%=$(RESULTS_DIR)/%.cov}
@@ -35,11 +35,11 @@ TARGET        = $(BIN_DIR)/$(TEST_EXE)
 
 all: $(TARGET) $(COV_OUTS)
 
-$(TEST_OBJS_DIR)/%.o: $(SB_SRC_DIR)/%.cpp | $(TEST_OBJS_DIR)
+$(TEST_OBJS_DIR)/%.o: $(TEST_SRC_DIR)/%.cpp | $(TEST_OBJS_DIR)
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) --analyze -o "$@".plist "$<"
 	$(CXX) -MMD -c $(CXXFLAGS) $(INCPATH) -o "$@" "$<"
 
-$(TEST_OBJS_DIR)/%.o: $(TEST_SRC_DIR)/%.cpp | $(TEST_OBJS_DIR)
+$(TEST_OBJS_DIR)/%.o: $(SB_SRC_DIR)/%.cpp | $(TEST_OBJS_DIR)
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) --analyze -o "$@".plist "$<"
 	$(CXX) -MMD -c $(CXXFLAGS) $(INCPATH) -o "$@" "$<"
 
@@ -77,3 +77,4 @@ $(BIN_DIR)/default.profraw: $(TARGET)
 .PHONY : all clean coverage clean-coverage
 
 -include $(TEST_SRCS:%.cpp=$(TEST_OBJS_DIR)/%.d)
+-include $(SB_SRCS:%.cpp=$(TEST_OBJS_DIR)/%.d)
