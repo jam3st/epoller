@@ -73,7 +73,7 @@ namespace Sb {
 
 	bool
 	ResolverImpl::Names::get(const Resolver::AddrPref& prefs, IpAddr& addr) const {
-		addr =  IpAddr {};
+		addr =  IpAddr { {} };
 		bool found = false;
 		bool once = false;
 		auto i = lastAccessIndex;
@@ -125,7 +125,7 @@ logDebug("resolved added " + dest.toString());
 			}
 		} else {
 			logDebug("adding request " + std::to_string(request));
-			requests[request] = {};
+			requests[request] = { prefs, {} };
 			requests[request].prefs = prefs;
 			if(prefs == Resolver::AddrPref::AnyAddr || prefs == Resolver::AddrPref::Ipv6Only) {
 				UdpSocket::create(nameServer, std::make_shared<UdpResolver>(*this, request, name, timeout, Query::Qtype::Aaaa));
@@ -182,7 +182,7 @@ logDebug("resolved added " + dest.toString());
 				auto bn = byName.find(ans.name);
 				if(bn == byName.end()) {
 					logDebug("adding new name" + ans.name);
-					byName.insert(std::make_pair(ans.name, Names {} ));
+					byName.insert(std::make_pair(ans.name, Names() ));
 					bn = byName.find(ans.name);
 				}
 				bn->second.put(ans);

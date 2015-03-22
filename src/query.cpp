@@ -7,38 +7,135 @@ namespace Sb {
 	namespace {
 		constexpr size_t MAX_DOMAIN_LEN = 64;
 
+		inline size_t getBits(const uint16_t& d, const size_t startBitPos, const size_t bitLen) {
+			uint16_t mask = ((1u << bitLen) - 1) << startBitPos;
+			return (d & mask) >> startBitPos;
+		}
+
+		inline size_t setBits(const uint16_t& d, const size_t startBitPos, const size_t bitLen, const uint16_t val) {
+			uint16_t clearMask = ~(((1u << bitLen) - 1) << startBitPos);
+			uint16_t setMask =  (val & ((1u << bitLen) - 1)) << startBitPos;
+			return (d & clearMask) | setMask;
+		}
+
+		enum class Rcode {
+			Ok = 0,
+			FormatError = 1,
+			ServerFailure = 2,
+			NameError = 3,
+			NotImplement = 4,
+			Refused = 5
+		};
+
+
+//		bool cd : 1;
+//		bool ad : 1;
+//		uint8_t z :	1;
+//		bool ra : 1;
+
+//		bool rd : 1;
+//		bool tc : 1;
+//		bool aa : 1;
+
+		enum class Opcode {
+			Query = 0,
+			Iquery = 1,
+			Status = 2
+		};
+
+		enum class Qr {
+			Query = 0,
+			Response = 1
+		};
+
+		class ReqFlags final {
+			public:
+				Qr qr() const {
+					return Qr(getBits(d, 0, 1));
+				}
+
+				void qr(const Qr qr) {
+					d = setBits(d, 0, 1, static_cast<decltype(d)>(qr));
+				}
+
+				Opcode opcode() const {
+					return Opcode(getBits(d, 1, 4));
+				}
+
+				void opcode(const Opcode opcode) {
+					d = setBits(d, 1, 4, static_cast<decltype(d)>(opcode));
+				}
+
+				bool aa() const {
+					return bool(getBits(d, 5, 1));
+				}
+
+				void aa(const bool aa) {
+					d = setBits(d, 5, 1, static_cast<decltype(d)>(aa));
+				}
+
+				bool tc() const {
+					return bool(getBits(d, 6, 1));
+				}
+
+				void tc(const bool tc) {
+					d = setBits(d, 6, 1, static_cast<decltype(d)>(tc));
+				}
+
+				bool rd() const {
+					return bool(getBits(d, 7, 1));
+				}
+
+				void rd(const bool rd) {
+					d = setBits(d, 7, 1, static_cast<decltype(d)>(rd));
+				}
+
+				bool ra() const {
+					return bool(getBits(d, 8, 1));
+				}
+
+				void ra(const bool ra) {
+					d = setBits(d, 8, 1, static_cast<decltype(d)>(ra));
+				}
+
+				size_t z() const {
+					return bool(getBits(d, 9, 1));
+				}
+
+				void z(const size_t z) {
+					d = setBits(d, 9, 1, static_cast<decltype(d)>(z));
+				}
+
+				bool ad() const {
+					return bool(getBits(d, 10, 1));
+				}
+
+				void ad(const bool ad) {
+					d = setBits(d, 10, 1, static_cast<decltype(d)>(ad));
+				}
+
+				bool cd() const {
+					return bool(getBits(d, 11, 1));
+				}
+
+				void cd(const bool cd) {
+					d = setBits(d, 11, 1, static_cast<decltype(d)>(cd));
+				}
+
+				Rcode rcode() const {
+					return Rcode(getBits(d, 12, 4));
+				}
+
+				void rcode(const Rcode rcode) {
+					d = setBits(d, 12, 4, static_cast<decltype(d)>(rcode));
+				}
+			private:
+				uint16_t d = 0;
+		};
+
 		struct Header final {
 			uint16_t id;
-
-			enum class rcode {
-				Ok = 0,
-				FormatError = 1,
-				ServerFailure = 2,
-				NameError = 3,
-				NotImplement = 4,
-				Refused = 5
-			} rcode  : 4 ;
-			bool cd : 1;
-			bool ad : 1;
-			uint8_t z :	1;
-			bool ra : 1;
-
-			bool rd : 1;
-			bool tc : 1;
-			bool aa : 1;
-
-			enum struct opcode {
-				Query = 0,
-				Iquery = 1,
-				Status = 2
-			} opcode  : 4 ;
-
-			enum class qr {
-				Query = 0,
-				Response = 1
-			} qr : 1;
-
-
+			ReqFlags reqFlags;
 			uint16_t qdcount;
 			uint16_t ancount;
 			uint16_t nscount;
@@ -93,7 +190,7 @@ namespace Sb {
 
 		Footer
 		decodeFooter(const std::vector<uint8_t>& response, size_t& curPos) {
-			Footer footer {};
+			Footer footer;
 			footer.qtype = static_cast<Query::Qtype>(networkEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
 			footer.qclass = static_cast<Qclass>(networkEndian(response[curPos], response[curPos + 1]));
@@ -103,7 +200,7 @@ namespace Sb {
 
 		Answer
 		decodeAnswer(const std::vector<uint8_t>& response, size_t& curPos) {
-			Answer answer {};
+			Answer answer;
 			answer.qtype = static_cast<Query::Qtype>(networkEndian(response[curPos], response[curPos + 1]));
 			curPos = curPos + 2;
 			answer.qclass = static_cast<Qclass>(networkEndian(response[curPos], response[curPos + 1]));
@@ -176,12 +273,13 @@ std::cerr << "name is " <<  name << std::endl;
 		std::vector<uint8_t>
 		resolve(uint16_t reqNo, const std::string& name, Qtype qType)  {
 			QueryHeader header {};
+std::cerr << "size is " << sizeof(header.h.reqFlags) <<  " " << sizeof(header.d) << std::endl;
 			header.h.id = reqNo;
-			header.h.qr = Header::qr::Query;
-			header.h.opcode = Header::opcode::Query;
-			header.h.tc = false;
-			header.h.rd = true;
-			header.h.aa = false;
+			header.h.reqFlags.qr(Qr::Query);
+			header.h.reqFlags.opcode(Opcode::Query);
+			header.h.reqFlags.tc(false);
+			header.h.reqFlags.rd(true);
+			header.h.reqFlags.aa(false);
 			header.h.qdcount = 1;
 			QueryFooter footer {};
 			footer.f.qclass = Qclass::Internet;

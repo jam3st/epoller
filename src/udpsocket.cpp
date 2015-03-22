@@ -24,7 +24,7 @@ namespace Sb {
 	UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf> client)
 		: Socket(Socket::createUdpSocket()),
 		  client(client),
-		  writeQueue(std::make_pair<const InetDest, const Bytes>({}, {})) {
+		  writeQueue(std::make_pair<const InetDest, const Bytes>( { { {} }, 0 }, {})) {
 		logDebug(std::string("UdpClient::UdpClient " + std::to_string(fd)));
 		pErrorThrow(fd);
 		Socket::makeNonBlocking(fd);
@@ -37,7 +37,7 @@ namespace Sb {
 	void UdpSocket::handleRead() {
 		logDebug("UdpClient::handleRead");
 		Bytes data(MAX_PACKET_SIZE);
-		InetDest from = { {} , 0 };
+		InetDest from = { { {} }, 0 };
 		const auto actuallyReceived = receiveDatagram(from, data);
 		if(actuallyReceived < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
 			logDebug("UdpClient::handleRead would block");
