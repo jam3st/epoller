@@ -11,15 +11,13 @@ namespace Sb {
 		public:
 			friend class TcpStream;
 			virtual void connected(const struct InetDest&) = 0;
+			virtual void disconnect() = 0;
 			virtual void received(const Bytes&) = 0;
 			virtual void writeComplete() = 0;
 			virtual void disconnected() = 0;
 			virtual void timeout(const size_t timerId) = 0;
-			virtual const std::shared_ptr<TcpStream> stream() const {
-				return tcpStream;
-			}
-		private:
-			std::shared_ptr<TcpStream> tcpStream;
+		protected:
+			std::weak_ptr<TcpStream> tcpStream;
 	};
 
 	class TcpStream : virtual public Socket {
@@ -31,17 +29,24 @@ namespace Sb {
 			virtual ~TcpStream();
 
 		protected:
-			void doWrite(const Bytes& data);
-			virtual void handleRead();
-			virtual void handleWrite();
-			virtual void handleError();
-			virtual void handleTimer(const size_t timerId);
+			void doWrite(Bytes const& data);
+			virtual void handleRead() override;
+			virtual void handleWrite() override;
+			virtual void handleError() override;
+			virtual void handleTimer(size_t const timerId) override;
+
+		private:
+		virtual bool writeHandler(bool const fromTrigger = false);
 
 		private:
 			const struct InetDest remote;
 			std::shared_ptr<TcpStreamIf> client;
 			std::mutex writeLock;
+			std::mutex readLock;
+			bool waitingWriteEvent;
 			SyncVec<Bytes> writeQueue;
+
+			bool disconnected = false;
 	};
 }
 

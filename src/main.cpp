@@ -48,23 +48,34 @@ findFirstPattern(const Bytes::iterator begin, const Bytes::iterator end, const B
 
 class Remote : public TcpStreamIf {
 	public:
-		Remote(const std::shared_ptr<TcpStream>& ep, Bytes& initWrite)
+		Remote(const std::weak_ptr<TcpStream> ep, Bytes& initWrite)
 			:ep(ep),
 			 initWrite(initWrite) {
-			logDebug("Remote created");
+			logDebug("Remote created initial " + std::to_string(initWrite.size()));
 		}
 		virtual ~Remote() {
 			logDebug("~Remote destroyed");
 		}
 
 		virtual void connected(const struct InetDest& dest) override {
-			logDebug("Remote connected " + dest.toString());
-			stream()->queueWrite(initWrite);
+			logDebug("Remote connected " + dest.toString() + " initial " + std::to_string(initWrite.size()));
+			if(auto ref = tcpStream.lock()) {
+				ref->queueWrite(initWrite);
+			}
+		}
+
+		virtual void disconnect() override {
+			logDebug("Remote disconnect");
+			if(auto ref = tcpStream.lock()) {
+				ref->disconnect();
+			}
 		}
 
 		virtual void received(const Bytes& x) override {
 			logDebug("Remote received");
-			ep->queueWrite(x);
+			if(auto ref = ep.lock()) {
+				ref->queueWrite(x);
+			}
 		}
 
 		virtual void writeComplete() override {
@@ -73,16 +84,21 @@ class Remote : public TcpStreamIf {
 
 		virtual void disconnected() override {
 			logDebug("Remote onDisconnect");
+			if(auto ref = ep.lock()) {
+				ref->disconnect();
+			}
+			logDebug("Remote onDisconnect ok");
 		}
 
 		void doWrite(const Bytes& x) {
-			auto ref = stream();
-			if(ref == nullptr) {
+			auto ref = tcpStream.lock();
+			if(ref != nullptr) {
+				ref->queueWrite(x);
+			} else {
+				logDebug("Remote doWrite deferred");
 				for(auto c : x) {
 					initWrite.push_back(c);
 				}
-			} else {
-				ref->queueWrite(x);
 			}
 		}
 
@@ -91,13 +107,14 @@ class Remote : public TcpStreamIf {
 			logDebug("blah expired");
 		}
 	private:
-		std::shared_ptr<TcpStream> ep;
+		std::weak_ptr<TcpStream> ep;
 		Bytes initWrite;
 };
 
 class HttpProxy : public TcpStreamIf {
 	public:
-		HttpProxy()	 {
+		HttpProxy() {
+			logDebug("HttpProxy::HttpProxy");
 		}
 
 		virtual ~HttpProxy() {
@@ -108,49 +125,44 @@ class HttpProxy : public TcpStreamIf {
 			logDebug("HttpProxy connected " + dest.toString());
 		}
 
+		virtual void disconnect() override {
+			logDebug("HttpProxy disconnect");
+			auto ref = tcpStream.lock();
+			if(ref != nullptr) {
+				ref->disconnect();
+			}
+		}
+
 		virtual void received(const Bytes& x) override {
 			logDebug("HttpProxy onReadCompleted");
-			if(ep != nullptr) {
+			auto ref = ep.lock();
+			if(ref != nullptr) {
 				logDebug("HttpProxy onReadCompleted to stream");
-				ep->doWrite(x);
+				ref->doWrite(x);
 				return;
 			}
 			std::cerr << std::string(x.begin(), x.end());
 			header.insert(header.end(), x.begin(), x.end());
 
-			bool doubleCr = false;
 			if(header.size() < 4) {
+				logDebug("HttpProxy onReadCompleted without enough data");
 				return;
 			}
-			bool prevCrLf = false;
-			bool prevlF = *header.end() == '\n';
-			//				std::find(header.begin(), header.end(), Bytes{ '\r', '\n', '\r', '\n' } );
-			for(auto it = std::end(header) - 1;	it != std::begin(header); --it) {
-				if(prevlF && *it == '\r' && prevCrLf) {
-					doubleCr = true;
-					logDebug("Got double CRLF");
-					break;
-				} else if(prevlF && *it == '\r') {
-					prevCrLf = true;
-					prevlF = false;
-				} else if(!prevlF && *it == '\n') {
-					prevlF = true;
-				} else {
-					prevCrLf = false;
-					prevlF = false;
-				}
-			}
-			if(!doubleCr) {
+			auto doubleCr = findFirstPattern(header.begin(), header.end(), { '\r', '\n', '\r', '\n'});
+			if(doubleCr.first == doubleCr.second) {
+				logDebug("HttpProxy onReadCompleted without double CR");
 				return;
 			}
-			auto crPos = header.end();
 			std::string host;
-			for(auto start = header.begin(); start != header.end(); start = crPos + 1) {
+			for(auto start = header.begin(); start != header.end();) {
 				while(*start == '\n') {
 					++start;
 				}
-				crPos = std::find(start, header.end(), '\r');
-								Bytes getPost(start, crPos);
+				auto crPos = std::find(start, header.end(), '\r');
+				if(crPos == header.end()) {
+					break;
+				}
+				Bytes getPost(start, crPos);
 				logDebug("line: " + std::string{getPost.begin(), getPost.end() } );
 				auto it = findFirstPattern(getPost.begin(), getPost.end(), { 'H', 'O', 'S', 'T', ':', '?'});
 				if(it.first != it.second) {
@@ -162,23 +174,29 @@ class HttpProxy : public TcpStreamIf {
 					logDebug("host: " +  host );
 				}
 
-				if(crPos == header.end()) {
+				if(crPos + 1 == header.end()) {
 					break;
 				}
+				start = crPos + 1;
 			}
+
 			uint16_t port = 80;
 			auto it = findFirstPattern(header.begin(), header.end(), { 'C', 'O', 'N', 'N', 'E', 'C', 'T', ' ' });
 			if(it.first != it.second) {
 				header.resize(0);
 				port = 443;
 			}
-
-std::cout << " ************************** host " << host  << " " << port << "**************************" << std::endl;
-			ep = std::make_shared<Remote>(stream(), header);
-			TcpConnection::create(host, port, ep);
+			auto sp = std::make_shared<Remote>(tcpStream, header);
+			ep = sp;
+			TcpConnection::create(host, port, sp);
 			if(port == 443) {
-				stream()->queueWrite( {'H', 'T', 'T', 'P', '/', '1', '.', '1', ' ',
-									 '2', '0', '0', ' ', 'O', 'K', '\r', '\n', '\r', '\n' } );
+				auto ref = tcpStream.lock();
+				if(ref != nullptr) {
+					ref->queueWrite({'H', 'T', 'T', 'P', '/', '1', '.', '1', ' ',
+										   '2', '0', '0', ' ', 'O', 'K', '\r', '\n', '\r', '\n'});
+				} else {
+					logDebug("HttpProxy tcpStream missing on connect");
+				}
 			}
 		}
 
@@ -187,7 +205,7 @@ std::cout << " ************************** host " << host  << " " << port << "***
 		}
 
 		virtual void disconnected() override {
-			logDebug("HttpProxy onDisconnect");
+			logDebug("HttpProxy::disconnected");
 		}
 
 		virtual void timeout(const size_t /*timerId*/) override {
@@ -196,7 +214,7 @@ std::cout << " ************************** host " << host  << " " << port << "***
 		}
 	private:
 		Bytes header;
-		std::shared_ptr<Remote> ep;
+		std::weak_ptr<Remote> ep;
 };
 
 class ResolveNameSy : public ResolverIf {
@@ -218,9 +236,12 @@ std::cerr << "Exit" << std::endl;
 
 int main (const int, const char* const argv[]) {
 	::close(0);
-	runUnit("timer", [] () { auto ref = std::make_shared<ExitTimer>(); Engine::addTimer(ref); ref->setTimer(0, NanoSecs{1'000'000'000 }); });
-	runUnit("resolve", [] () { Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "www.google.com.au", Resolver::AddrPref::Ipv4Only); });
-	runUnit("httpproxy", [] () { TcpListener::create(1024, [] () { return std::make_shared<HttpProxy>(); } ); });
+
+//	runUnit("timer", [] () { auto ref = std::make_shared<ExitTimer>(); Engine::addTimer(ref); ref->setTimer(0, NanoSecs{1'000'000'000 }); });
+//	runUnit("resolve", [] () { Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "www.google.com.au", Resolver::AddrPref::Ipv4Only); });
+	runUnit("httpproxy", [] () { TcpListener::create(1024, [] () {
+		std::cerr << "Creating httproxy" << std::endl;
+		return std::make_shared<HttpProxy>(); } ); });
 
 	std::cerr << argv[0] << " exited." << std::endl;
 

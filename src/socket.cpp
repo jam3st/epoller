@@ -13,7 +13,7 @@ namespace Sb {
 		struct sockaddr addr;
 	} SocketAddress;
 
-	static std::string inetAddressToString(const SocketAddress& addr);
+	static std::string addressToString(const SocketAddress &addr);
 
 	Socket::Socket(const int fd)
 	 : fd(fd) {
@@ -25,7 +25,8 @@ namespace Sb {
 
 	Socket::~Socket() {
 		logDebug("Socket::~Socket() closed and shutdown " + std::to_string(fd));
-		if(fd > 0) {
+		if(fd >= 0) {
+			logDebug("Socket::~Socket() closed fd " + std::to_string(fd));
 			::close(fd);
 		}
 	}
@@ -67,7 +68,7 @@ namespace Sb {
 	}
 
 	int Socket::read(Bytes& data) const {
-		logDebug("Asked to read with buffer size of  "  + std::to_string(data.size ()));
+		logDebug("Asked to read with buffer size of  "  + std::to_string(data.size()) + " on " + std::to_string(fd));
 		int numRead = ::read(fd, &data[0], data.size());
 		pErrorLog(numRead);
 		logDebug("Read "  + std::to_string(numRead) + " on " + std::to_string(fd));
@@ -93,7 +94,7 @@ namespace Sb {
 		socklen_t addrLen = sizeof addr.addrIn6;
 		int aFd = ::accept(fd, &addr.addr, &addrLen);
 		assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
-		logDebug("Accept connection from "  + inetAddressToString(addr) + " on fd " + std::to_string(aFd));
+		logDebug("Accept connection from "  + addressToString(addr) + " on fd " + std::to_string(aFd));
 		return aFd;
 	}
 
@@ -105,7 +106,7 @@ namespace Sb {
 		assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
 		::memcpy(&whereFrom.addr, &addr.addrIn6.sin6_addr, sizeof whereFrom.addr);
 		whereFrom.port = networkEndian(addr.addrIn6.sin6_port);
-		logDebug("Datagram from: " + inetAddressToString(addr) + " " + std::to_string(whereFrom.port));
+		logDebug("Datagram from: " + addressToString(addr) + " " + std::to_string(whereFrom.port));
 
 		if(numReceived >= 0 && data.size() - numReceived > 0) {
 			data.resize(numReceived);
@@ -140,20 +141,25 @@ namespace Sb {
 		addr.addrIn6.sin6_port = networkEndian(whereTo.port);
 		::memcpy(&addr.addrIn6.sin6_addr, &whereTo.addr, sizeof addr.addrIn6.sin6_addr);
 		::connect(fd, &addr.addr, sizeof addr.addrIn6);
-		logDebug("Connect to "  + inetAddressToString(addr) + " on fd " + std::to_string(fd));
+		logDebug("Connect to "  + addressToString(addr) + ":" + std::to_string(whereTo.port) + " on fd " + std::to_string(fd));
 	}
 
 	InetDest Socket::destFromString(const std::string& where, const uint16_t port) {
 		InetDest dest;
 		dest.port = port;
-		inet_pton(AF_INET6, &where[0], &dest.addr);
+		dest.valid = false;
+		if(inet_pton(AF_INET, &where[0], &dest.addr) > 0) {
+			std::string af6Dest = "::ffff:" + where;
+			dest.valid = inet_pton(AF_INET6, &af6Dest[0], &dest.addr) > 0;
+		} else if(!dest.valid) {
+			dest.valid = inet_pton(AF_INET6, &where[0], &dest.addr) > 0;
+		}
 		return dest;
 	}
 
-	static std::string inetAddressToString(const SocketAddress& addr) {
+	std::string addressToString(const SocketAddress &addr) {
 		char buf[INET6_ADDRSTRLEN];
 		inet_ntop(AF_INET6, &addr.addrIn6.sin6_addr, buf, sizeof buf);
 		return std::string(buf);
-
 	}
 }

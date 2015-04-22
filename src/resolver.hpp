@@ -24,13 +24,14 @@ namespace Sb {
 			};
 			void init();
 			void resolve(std::shared_ptr<ResolverIf> client, const std::string&, const AddrPref& prefs = AddrPref::AnyAddr,
-						 const NanoSecs& timeout = NanoSecs { 2'000'000'000 }, const InetDest& nameServer = Socket::destFromString("2001:4860:4860::8888", 53) );
+						 const NanoSecs& timeout = NanoSecs { 2'000'000'000 }, const InetDest& nameServer = Socket::destFromString("::ffff:127.0.0.1", 53) );
 			void cancel(const ResolverIf* client);
 		private:
 			void destroy();
 			Resolver();
 			~Resolver();
 		private:
+		// TODO: Change to weak_ptr
 			std::shared_ptr<ResolverImpl> impl;
 	};
 }

@@ -11,7 +11,7 @@ namespace Sb {
 			virtual void setTimer(const int timerId, const NanoSecs& timeout) final;
 			virtual void cancelTimer(const int timerId) final;
 		protected:
-			virtual std::shared_ptr<TimeEvent> ref() final;
+			 virtual std::shared_ptr<TimeEvent> ref() final;
 		private:
 			friend class Engine;
 			virtual void handleTimer(const size_t timerId) = 0;

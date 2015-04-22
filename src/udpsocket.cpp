@@ -24,7 +24,7 @@ namespace Sb {
 	UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf> client)
 		: Socket(Socket::createUdpSocket()),
 		  client(client),
-		  writeQueue(std::make_pair<const InetDest, const Bytes>( { { {} }, 0 }, {})) {
+		  writeQueue(std::make_pair<const InetDest, const Bytes>( { { {} }, 0, false }, {})) {
 		logDebug(std::string("UdpClient::UdpClient " + std::to_string(fd)));
 		pErrorThrow(fd);
 		Socket::makeNonBlocking(fd);
@@ -49,11 +49,11 @@ namespace Sb {
 	void UdpSocket::queueWrite(const InetDest& dest, const Bytes& data) {
 		logDebug("UdpSocket::queueWrite() " + dest.toString() + " " + std::to_string(fd));
 		std::lock_guard<std::mutex> sync(writeLock);
-		auto wasEmpty = writeQueue.isEmpty();
-		writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data)));
-		if(wasEmpty) {
-			handleWrite();
-		}
+//		auto wasEmpty = writeQueue.isEmpty();
+//		writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data)));
+//		if(wasEmpty) {
+//			handleWrite();
+//		}
 	}
 
 
@@ -71,7 +71,6 @@ namespace Sb {
 		if(actuallySent == -1) {
 			if(errno == EWOULDBLOCK || errno == EAGAIN) {
 				logDebug(std::string("UdpSocket::doWrite would block"));
-//add to front
 				writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data)));
 				return;
 			} else {
@@ -86,7 +85,6 @@ namespace Sb {
 			logDebug("Write " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen) + " on " + std::to_string(getFd()));
 		} else if (actuallySent > 0) {
 			logDebug("Partial write of " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen));
-//add to front
 			writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data.begin () + actuallySent, data.end ())));
 		}
 	}
@@ -94,15 +92,14 @@ namespace Sb {
 	void UdpSocket::handleWrite() {
 		logDebug("UdpSocket::handleWrite() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
 		for(;;) {
-			bool isEmpty = true;
-			auto& data = writeQueue.removeAndIsEmpty(isEmpty);
-			if(isEmpty) {
+			auto data = writeQueue.removeAndIsEmpty();
+			if(data.second) {
 				logDebug("write queue is empty notifying client");
 				auto ref = this->ref();
 				client->writeComplete();
 				return;
 			}
-			doWrite(data.first, data.second);
+			doWrite(data.first.first, data.first.second);
 		}
 	}
 

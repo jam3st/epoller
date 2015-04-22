@@ -11,10 +11,11 @@ namespace Sb {
 	typedef std::array<uint8_t, 128 / 8>  IpAddr;
 	constexpr ssize_t MAX_PACKET_SIZE = 4096;
 
-
 	struct InetDest {
 		IpAddr addr;
+		bool valid;
 		uint16_t port;
+
 		std::string toString() const {
 			std::stringstream stream;
 //			bool addrZero = true;
@@ -25,7 +26,5 @@ namespace Sb {
 			stream << std::setw(-1) << std::dec << port;
 			return stream.str();
 		}
-
 	};
-
 }

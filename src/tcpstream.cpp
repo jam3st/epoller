@@ -1,24 +1,25 @@
 ﻿#include "logger.hpp"
 #include "tcpstream.hpp"
-#include "utils.hpp"
-
 
 namespace Sb {
 	void TcpStream::create(const int fd, const InetDest remote,
 						 std::shared_ptr<TcpStreamIf> client, const bool replace) {
 		auto ref = std::make_shared<TcpStream>(fd, remote, client);
-		Engine::add(ref, replace);
+
 		logDebug("TcpStream::create() my ref " + std::to_string(ref.use_count()) +
-				 " their refs " + std::to_string(client.use_count()) + " "  + std::to_string(fd));
+				 " their refs " + std::to_string(client.use_count())  + " dest " + remote.toString()  + " client " + intToHexString(client) + " "  + std::to_string(fd));
 		client->tcpStream = ref;
 		client->connected(remote);
+		Engine::add(ref, replace);
+		logDebug("TcpStream::create() my ref " + std::to_string(ref.use_count()) + " their refs " + std::to_string(client.use_count())+ " "  + std::to_string(fd));
 	}
 
 	TcpStream::TcpStream(const int fd, const InetDest remote, std::shared_ptr<TcpStreamIf>& client) :
 						Socket(fd),
 						remote(remote),
 						client(client),
-						writeQueue({}) {
+						waitingWriteEvent(false),
+						writeQueue( {} ) {
 		Socket::makeNonBlocking(fd);
 		logDebug(std::string("TcpStream::TcpStream " + std::to_string(getFd())));
 	}
@@ -28,6 +29,7 @@ namespace Sb {
 	}
 
 	void TcpStream::handleRead() {
+		std::lock_guard<std::mutex> sync(readLock);
 		logDebug("TcpStream::handleRead()");
 		for(;;) {
 			Bytes data(MAX_PACKET_SIZE);
@@ -37,65 +39,93 @@ namespace Sb {
 				return;
 			}
 			if(actuallyRead == -1 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
-				logDebug(std::string("TcpStream::handleRead would block"));
+				logDebug(std::string("TcpStream::handleRead would block " + std::to_string(fd)));
 				return;
 			}
-			auto ref = this->ref();
-			client->received(data);
+			auto tmp = client;
+			if(tmp == nullptr) {
+				logDebug("TcpStream::handleRead() client deleted.");
+				return;
+			}
+			tmp->received(data);
 			logDebug("On read completed " + std::to_string(getFd()));
 		}
 	}
 
 	void TcpStream::handleWrite() {
-		logDebug("TcpStream::handleWrite() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
-		for(;;) {
-			bool isEmpty = true;
-			auto& data = writeQueue.removeAndIsEmpty(isEmpty);
-			if(isEmpty) {
+		writeHandler(true);
+	}
+
+	bool TcpStream::writeHandler(bool const fromTrigger) {
+		std::lock_guard<std::mutex> sync(writeLock);
+		bool notify = false;
+		if(waitingWriteEvent && !fromTrigger) {
+			logDebug("TcpStream::writeHandler() write alread triggered  " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
+		} else {
+			logDebug("TcpStream::writeHandler() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
+			auto data = writeQueue.removeAndIsEmpty();
+			if (data.second) {
 				logDebug("write queue is empty notifying client");
-				auto ref = this->ref();
-				client->writeComplete();
-				return;
+				notify = true;
+				if(fromTrigger) {
+					waitingWriteEvent = false;
+				}
+			} else {
+				doWrite(data.first);
 			}
-			doWrite(data);
 		}
+		return notify;
 	}
 
 	void TcpStream::handleError() {
-		logDebug("TcpStream::handleError() " + std::to_string(writeQueue.len()));
-		auto ref = this->ref();
-		client->disconnected();
+		logDebug("TcpStream::handleError() with remaining " + std::to_string(writeQueue.len()));
 		disconnect();
 	}
 
 	void TcpStream::disconnect() {
-		logDebug("TcpStream::disconnect() my ref " + std::to_string(this->ref().use_count()) +
-				 " their refs " + std::to_string(client.use_count()) + " " + remote.toString() + " " +  std::to_string(fd));
-		Engine::remove(this);
+		logDebug("TcpStream::disconnect() my ref " + std::to_string(disconnected) + " " + std::to_string(ref().use_count()) + " " + remote.toString() + " " +  std::to_string(fd));
+		if(!disconnected) {
+			disconnected = true;
+			if (client != nullptr) {
+				logDebug("TcpStream::disconnect()  my ref " + std::to_string(ref().use_count()) + " client ref " +
+																								  std::to_string(client.use_count()) + " " + remote.toString() + " " +
+																								  std::to_string(fd));
+				client->disconnected();
+				logDebug("TcpStream::disconnect()  my ref " + std::to_string(ref().use_count()) + " client ref " +
+																								  std::to_string(client.use_count()) + " " + remote.toString() + " " +
+																								  std::to_string(fd));
+				client = nullptr;
+			}
+			Engine::remove(this);
+		}
+		logDebug("TcpStream::disconnect() my ref " + std::to_string(ref().use_count()) + " " + remote.toString() + " " +  std::to_string(fd));
 	}
 
 	void TcpStream::queueWrite(const Bytes& data) {
 		logDebug("TcpStream::queueWrite() " + std::to_string(fd));
-		std::lock_guard<std::mutex> sync(writeLock);
-		auto wasEmpty = writeQueue.isEmpty();
 		writeQueue.add(data);
-		if(wasEmpty) {
-			handleWrite();
+		if(writeHandler()) {
+			if (client != nullptr) {
+				client->writeComplete();
+			}
 		}
 	}
 
-	void TcpStream::handleTimer(const size_t timerId) {
+	void TcpStream::handleTimer(size_t const timerId) {
 		logDebug("TcpListener::handleTimer() " + std::to_string(timerId) + " " + std::to_string(fd));
 		client->timeout(timerId);
 	}
 
-	void TcpStream::doWrite(const Bytes& data) {
-		logDebug(std::string("TcpStream::queueWrite writing " + std::to_string(data.size())) + " "  + std::to_string(fd));
+	void TcpStream::doWrite(Bytes const& data) {
+		logDebug(std::string("TcpStream::doWrite writing " + std::to_string(data.size())) + " "  + std::to_string(fd));
 		const auto actuallySent = write(data);
-		logDebug(std::string("TcpStream::queueWrite actually wrote " + std::to_string(actuallySent)));
+		logDebug(std::string("TcpStream::doWrite actually wrote " + std::to_string(actuallySent)
+				 + " out of " + std::to_string(data.size()) + " on " + std::to_string(fd)));
 		pErrorLog(getFd());
 		if(actuallySent == -1 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
 			logDebug(std::string("TcpStream::queueWrite would block"));
+			waitingWriteEvent = true;
+
 			writeQueue.add(data);
 			return;
 		}
@@ -104,7 +134,8 @@ namespace Sb {
 			return;
 		}
 
-		decltype(actuallySent) dataLen = data.size();
+		const decltype(actuallySent) dataLen = data.size();
+
 		if(actuallySent == dataLen) {
 			logDebug("Write " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen) + " on " + std::to_string(getFd()));
 		} else if (actuallySent > 0) {

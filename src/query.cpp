@@ -27,16 +27,6 @@ namespace Sb {
 			Refused = 5
 		};
 
-
-//		bool cd : 1;
-//		bool ad : 1;
-//		uint8_t z :	1;
-//		bool ra : 1;
-
-//		bool rd : 1;
-//		bool tc : 1;
-//		bool aa : 1;
-
 		enum class Opcode {
 			Query = 0,
 			Iquery = 1,
@@ -51,83 +41,83 @@ namespace Sb {
 		class ReqFlags final {
 			public:
 				Qr qr() const {
-					return Qr(getBits(d, 0, 1));
+					return Qr(getBits(d, 15, 1));
 				}
 
 				void qr(const Qr qr) {
-					d = setBits(d, 0, 1, static_cast<decltype(d)>(qr));
+					d = setBits(d, 15, 1, static_cast<decltype(d)>(qr));
 				}
 
 				Opcode opcode() const {
-					return Opcode(getBits(d, 1, 4));
+					return Opcode(getBits(d, 11, 4));
 				}
 
 				void opcode(const Opcode opcode) {
-					d = setBits(d, 1, 4, static_cast<decltype(d)>(opcode));
+					d = setBits(d, 11, 4, static_cast<decltype(d)>(opcode));
 				}
 
 				bool aa() const {
-					return bool(getBits(d, 5, 1));
-				}
-
-				void aa(const bool aa) {
-					d = setBits(d, 5, 1, static_cast<decltype(d)>(aa));
-				}
-
-				bool tc() const {
-					return bool(getBits(d, 6, 1));
-				}
-
-				void tc(const bool tc) {
-					d = setBits(d, 6, 1, static_cast<decltype(d)>(tc));
-				}
-
-				bool rd() const {
-					return bool(getBits(d, 7, 1));
-				}
-
-				void rd(const bool rd) {
-					d = setBits(d, 7, 1, static_cast<decltype(d)>(rd));
-				}
-
-				bool ra() const {
-					return bool(getBits(d, 8, 1));
-				}
-
-				void ra(const bool ra) {
-					d = setBits(d, 8, 1, static_cast<decltype(d)>(ra));
-				}
-
-				size_t z() const {
-					return bool(getBits(d, 9, 1));
-				}
-
-				void z(const size_t z) {
-					d = setBits(d, 9, 1, static_cast<decltype(d)>(z));
-				}
-
-				bool ad() const {
 					return bool(getBits(d, 10, 1));
 				}
 
+				void aa(const bool aa) {
+					d = setBits(d, 10, 1, static_cast<decltype(d)>(aa));
+				}
+
+				bool tc() const {
+					return bool(getBits(d, 9, 1));
+				}
+
+				void tc(const bool tc) {
+					d = setBits(d, 9, 1, static_cast<decltype(d)>(tc));
+				}
+
+				bool rd() const {
+					return bool(getBits(d, 8, 1));
+				}
+
+				void rd(const bool rd) {
+					d = setBits(d, 8, 1, static_cast<decltype(d)>(rd));
+				}
+
+				bool ra() const {
+					return bool(getBits(d, 7, 1));
+				}
+
+				void ra(const bool ra) {
+					d = setBits(d, 7, 1, static_cast<decltype(d)>(ra));
+				}
+
+				size_t z() const {
+					return bool(getBits(d, 6, 1));
+				}
+
+				void z(const size_t z) {
+					d = setBits(d, 6, 1, static_cast<decltype(d)>(z));
+				}
+
+				bool ad() const {
+					return bool(getBits(d, 5, 1));
+				}
+
 				void ad(const bool ad) {
-					d = setBits(d, 10, 1, static_cast<decltype(d)>(ad));
+					d = setBits(d, 5, 1, static_cast<decltype(d)>(ad));
 				}
 
 				bool cd() const {
-					return bool(getBits(d, 11, 1));
+					return bool(getBits(d, 4, 1));
 				}
 
 				void cd(const bool cd) {
-					d = setBits(d, 11, 1, static_cast<decltype(d)>(cd));
+					d = setBits(d, 4, 1, static_cast<decltype(d)>(cd));
 				}
 
 				Rcode rcode() const {
-					return Rcode(getBits(d, 12, 4));
+					return Rcode(getBits(d, 0, 4));
 				}
 
 				void rcode(const Rcode rcode) {
-					d = setBits(d, 12, 4, static_cast<decltype(d)>(rcode));
+					d = setBits(d, 0	, 4, static_cast<decltype(d)>(rcode));
 				}
 			private:
 				uint16_t d = 0;
@@ -221,6 +211,7 @@ std::cerr << "ANWER " << (int)answer.qclass	<< " type " << (int)answer.qtype << 
 					header.d[i] = networkEndian(data[i * 2], data[i * 2 + 1]);
 				}
 			}
+std::cerr << "RCODE " << (int)header.h.reqFlags.rcode() << " TC " << header.h.reqFlags.tc() << " ra " << header.h.reqFlags.ra() << std::endl;
 			return header;
 		}
 
@@ -279,6 +270,7 @@ std::cerr << "size is " << sizeof(header.h.reqFlags) <<  " " << sizeof(header.d)
 			header.h.reqFlags.opcode(Opcode::Query);
 			header.h.reqFlags.tc(false);
 			header.h.reqFlags.rd(true);
+			header.h.reqFlags.ra(false);
 			header.h.reqFlags.aa(false);
 			header.h.qdcount = 1;
 			QueryFooter footer {};
@@ -288,6 +280,7 @@ std::cerr << "size is " << sizeof(header.h.reqFlags) <<  " " << sizeof(header.d)
 			query.reserve(sizeof(header) + sizeof(footer) + 2 * name.length());
 			for(size_t i = 0; i < sizeof(header) / sizeof(header.d[0]); ++i) {
 				networkEndian(header.d[i], query);
+std::cerr << "hd " << header.d[i] << std::endl;
 			}
 			encodeName(name, query);
 			for(size_t i = 0; i < sizeof(footer) / sizeof(footer.d[0]); ++i) {
@@ -330,7 +323,7 @@ std::cerr << "Reply: " << std::to_string(i) << std::endl;
 						addr[i + 2] = data[curPos + 2];
 						addr[i + 3] = data[curPos + 3];
 						reply.addr.push_back(addr);
-InetDest dest { addr, 12444 };
+InetDest dest { addr, false, 12444 };
 logDebug("resolved added " + dest.toString());
 
 						reply.valid = true;

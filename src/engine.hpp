@@ -10,7 +10,6 @@
 #include "socket.hpp"
 #include "syncvec.hpp"
 #include "timeevent.hpp"
-#include "stats.hpp"
 #include "resolver.hpp"
 
 namespace Sb {
@@ -28,7 +27,7 @@ namespace Sb {
 			static NanoSecs cancelTimer(TimeEvent* owner, const size_t timerId);
 
 			~Engine();
-			void syncChronise();
+			void sync();
 			void startWorkers(int minWorkersPerCpu);
 			void stopWorkers();
 		private:
@@ -42,7 +41,6 @@ namespace Sb {
 					~Worker();
 					std::thread thread;
 					std::atomic_bool exited;
-					Stats stats;
 			};
 		private:
 			Engine();

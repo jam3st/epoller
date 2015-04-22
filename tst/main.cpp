@@ -48,21 +48,18 @@ findFirstPattern(const Bytes::iterator begin, const Bytes::iterator end, const B
 
 class Remote : public TcpStreamIf {
 	public:
-		Remote(const std::shared_ptr<TcpStream>& xxx, Bytes& initWrite)
-			:ep(xxx),
+		Remote(const std::shared_ptr<TcpStream>& ep, Bytes& initWrite)
+			:ep(ep),
 			 initWrite(initWrite) {
-if(xxx == nullptr) {
-	__builtin_trap();
-}
+			logDebug("Remote created");
 		}
 		virtual ~Remote() {
 			logDebug("~Remote destroyed");
 		}
 
-		virtual void connected(std::shared_ptr<TcpStream> str, const struct InetDest& dest) override {
-			stream = str;
-			logDebug("Remote onConnect " + dest.toString());
-			str->queueWrite(initWrite);
+		virtual void connected(const struct InetDest& dest) override {
+			logDebug("Remote connected " + dest.toString());
+			stream()->queueWrite(initWrite);
 		}
 
 		virtual void received(const Bytes& x) override {
@@ -76,7 +73,17 @@ if(xxx == nullptr) {
 
 		virtual void disconnected() override {
 			logDebug("Remote onDisconnect");
-			stream = nullptr;
+		}
+
+		void doWrite(const Bytes& x) {
+			auto ref = stream();
+			if(ref == nullptr) {
+				for(auto c : x) {
+					initWrite.push_back(c);
+				}
+			} else {
+				ref->queueWrite(x);
+			}
 		}
 
 		virtual void timeout(const size_t /*timerId*/) override {
@@ -85,33 +92,27 @@ if(xxx == nullptr) {
 		}
 	private:
 		std::shared_ptr<TcpStream> ep;
-		const Bytes& initWrite;
+		Bytes initWrite;
 };
 
 class HttpProxy : public TcpStreamIf {
 	public:
 		HttpProxy()	 {
-			stream.reset();
 		}
 
 		virtual ~HttpProxy() {
 			logDebug("~HttpProxy destroyed");
 		}
 
-		virtual void connected(std::shared_ptr<TcpStream> str, const struct InetDest& dest) override {
-			logDebug("HttpProxy onConnect " + dest.toString());
-			stream = str;
-//			s.setTimer(0, NanoSecs(300000000000));
-//			s.setTimer(5, NanoSecs(10000000000));
-//			s.setTimer(5, NanoSecs(10000000000));
-//			s.setTimer(5, NanoSecs(10000000000));
+		virtual void connected(const struct InetDest& dest) override {
+			logDebug("HttpProxy connected " + dest.toString());
 		}
 
 		virtual void received(const Bytes& x) override {
 			logDebug("HttpProxy onReadCompleted");
-			if(ep.get() != nullptr) {
+			if(ep != nullptr) {
 				logDebug("HttpProxy onReadCompleted to stream");
-				ep->getStream()-> queueWrite(x);
+				ep->doWrite(x);
 				return;
 			}
 			std::cerr << std::string(x.begin(), x.end());
@@ -154,6 +155,10 @@ class HttpProxy : public TcpStreamIf {
 				auto it = findFirstPattern(getPost.begin(), getPost.end(), { 'H', 'O', 'S', 'T', ':', '?'});
 				if(it.first != it.second) {
 					host = std::string{it.second + 1, getPost.end()};
+					auto delim = host.find_first_of(':');
+					if(delim != std::string::npos) {
+						host.resize(delim);
+					}
 					logDebug("host: " +  host );
 				}
 
@@ -168,9 +173,13 @@ class HttpProxy : public TcpStreamIf {
 				port = 443;
 			}
 
-			std::cout << " ************************** host " << host  << " " << port << "**************************" << std::endl;
-			ep =  std::make_shared<Remote>(stream, header);
+std::cout << " ************************** host " << host  << " " << port << "**************************" << std::endl;
+			ep = std::make_shared<Remote>(stream(), header);
 			TcpConnection::create(host, port, ep);
+			if(port == 443) {
+				stream()->queueWrite( {'H', 'T', 'T', 'P', '/', '1', '.', '1', ' ',
+									 '2', '0', '0', ' ', 'O', 'K', '\r', '\n', '\r', '\n' } );
+			}
 		}
 
 		virtual void writeComplete() override {
@@ -179,8 +188,6 @@ class HttpProxy : public TcpStreamIf {
 
 		virtual void disconnected() override {
 			logDebug("HttpProxy onDisconnect");
-			stream.reset();
-			ep.reset();
 		}
 
 		virtual void timeout(const size_t /*timerId*/) override {
@@ -189,7 +196,7 @@ class HttpProxy : public TcpStreamIf {
 		}
 	private:
 		Bytes header;
-		std::shared_ptr<TcpStreamIf> ep;
+		std::shared_ptr<Remote> ep;
 };
 
 class ResolveNameSy : public ResolverIf {
@@ -202,10 +209,21 @@ class ResolveNameSy : public ResolverIf {
 		}
 };
 
+class ExitTimer : public TimeEvent {
+	void handleTimer(const size_t) override {
+std::cerr << "Exit" << std::endl;
+		Engine::removeTimer(this);
+	}
+};
+
 int main (const int, const char* const argv[]) {
 	::close(0);
+	runUnit("timer", [] () { auto ref = std::make_shared<ExitTimer>(); Engine::addTimer(ref); ref->setTimer(0, NanoSecs{1'000'000'000 }); });
 	runUnit("resolve", [] () { Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "www.google.com.au", Resolver::AddrPref::Ipv4Only); });
+	runUnit("httpproxy", [] () { TcpListener::create(1024, [] () { return std::make_shared<HttpProxy>(); } ); });
+
 	std::cerr << argv[0] << " exited." << std::endl;
+
 	return 0;
 }
 

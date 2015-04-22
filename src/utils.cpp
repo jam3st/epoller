@@ -18,6 +18,8 @@ __builtin_trap();
 	void pErrorThrow(const int error) {
 		if(error < 0) {
 			auto errorText = ::strerror(errno);
+			logError(std::string("pErrorThrow: ") + errorText);
+	__builtin_trap();
 			throw std::runtime_error(errorText);
 		}
 	}
@@ -80,7 +82,19 @@ __builtin_trap();
 		return stream.str().size() > 0 ? stream.str() : "EMPTY";
 	}
 
-	Bytes stringToBytes(const std::string src) {
-		return Bytes(src.begin(), src.end());
+	std::string toHexString(Bytes const& src) {
+		constexpr auto numPerLine = 32;
+		std::stringstream stream;
+		stream << std::setfill('0') << std::setw(8) << std::hex << 0;
+		for(size_t i = 0; i < src.size() / numPerLine; ++i) {
+			auto rowStartPos = i * numPerLine;
+			stream << ":";
+			for(size_t j = rowStartPos; j < src.size() && j < rowStartPos + numPerLine; ++j) {
+				stream << " " << std::setw(2) <<  std::setfill('0') << std::hex << static_cast<size_t >(src.at(j));
+			}
+			stream << std::endl << std::setfill('0') << std::setw(8) << std::hex << (i + 1) * numPerLine;
+		}
+		stream << std::endl;
+		return stream.str();
 	}
 }

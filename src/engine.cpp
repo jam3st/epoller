@@ -25,12 +25,9 @@ namespace Sb {
 		  epollFd(::epoll_create(23423)),
 		  timerFd(::timerfd_create (CLOCK_MONOTONIC, TFD_NONBLOCK)),
 		  timers(Engine::setTrigger) {
-		initSignals();
+		blockSignals();
 		Logger::start();
 		Logger::setMask(Logger::LogType::EVERYTHING);
-		Logger::setMask(Logger::LogType::NOTHING);
-		Logger::setMask(Logger::LogType::WARNING);
-Logger::setMask(Logger::LogType::EVERYTHING);
 		assert(epollFd >=0, "Failed to create epollFd");
 		assert(timerFd >=0, "Failed to create timerFd");
 		epoll_event event = { 0, { 0 } };
@@ -40,7 +37,8 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 	}
 
 	Engine::~Engine() {
-		::signal(SIGINT, SIG_DFL);
+		blockSignals();
+		::signal(SIGUSR2, SIG_DFL);
 		::close(timerFd);
 		::close(epollFd);
 		eventHash.clear();
@@ -64,9 +62,18 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 
 	void
 	Engine::signalHandler(int signalNum) {
-		if(signalNum != SIGCONT) {
+		if(signalNum == SIGQUIT) {
+//			__builtin_debugtrap();
+		} else {
 			Engine::theEngine->doSignalHandler();
 		}
+	}
+
+	void
+	Engine::blockSignals() {
+		sigset_t sigMask;
+		::sigfillset(&sigMask);
+		pErrorThrow(::sigprocmask(SIG_SETMASK, &sigMask, nullptr));
 	}
 
 	void
@@ -77,17 +84,23 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 	}
 
 	void
-	Engine::initSignals()
-	{
+	Engine::initSignals() {
 		struct sigaction sigAction;
 		sigAction.sa_handler = Engine::signalHandler;
 		sigAction.sa_flags = SA_RESTART;
 		sigAction.sa_restorer = nullptr;
 		::sigemptyset(&sigAction.sa_mask);
-		::sigaction(SIGINT, &sigAction, nullptr);
+		pErrorThrow(::sigaction(SIGQUIT, &sigAction, nullptr));
+		pErrorThrow(::sigaction(SIGINT, &sigAction, nullptr));
+		pErrorThrow(::sigaction(SIGTERM, &sigAction, nullptr));
+		pErrorThrow(::sigaction(SIGUSR2, &sigAction, nullptr));
 		sigset_t sigMask;
-		::sigemptyset(&sigMask);
-		::sigaddset(&sigMask, SIGINT);
+		::sigfillset(&sigMask);
+		::sigdelset(&sigMask, SIGQUIT);
+		::sigdelset(&sigMask, SIGINT);
+		::sigdelset(&sigMask, SIGTERM);
+		::sigdelset(&sigMask, SIGUSR2);
+		pErrorThrow(::sigprocmask(SIG_SETMASK, &sigMask, nullptr));
 	}
 
 	void Engine::startWorkers(int minWorkersPerCpu) {
@@ -101,10 +114,8 @@ Logger::setMask(Logger::LogType::EVERYTHING);
 
 	void Engine::stopWorkers()	{
 		bool waiting = true;
-logDebug("stop works");
 		for(int i = MAX_SHUTDOWN_ATTEMPTS; i > 0 && waiting; i--) {
 			waiting = false;
-logDebug("stop works " + std::to_string(i));
 			for(auto& slave: slaves) {
 				if(!slave->exited) {
 					eventQueue.add(EpollEvent(nullptr, 0));
@@ -119,15 +130,16 @@ logDebug("stop works " + std::to_string(i));
 		for(auto& slave: slaves) {
 			delete slave;
 		}
-logDebug("stoped works");
 	}
 
 	void
 	Engine::doInit(int minWorkersPerCpu) {
 		assert(eventHash.size() > NUM_ENGINE_EVENTS, "Need to Add() something before Go().");
+		initSignals();
 		startWorkers(minWorkersPerCpu);
 		doEpoll();
 		stopWorkers();
+		blockSignals();
 		theResolver.destroy();
 	}
 
@@ -203,8 +215,8 @@ logDebug("stoped works");
 	std::shared_ptr<TimeEvent>
 	Engine::getEv(const TimeEvent* what)
 	{
-		auto it = eventHash.find(what);
 		std::lock_guard<std::mutex> sync(evHashLock);
+		auto it = eventHash.find(what);
 		if(it == eventHash.end()) {
 			return nullptr;
 		}
@@ -220,7 +232,11 @@ logDebug("stoped works");
 			epoll_event event = { 0, { 0 } };
 			event.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLRDHUP;
 			event.data.ptr = what.get();
-			pErrorThrow (::epoll_ctl (epollFd, replace ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, what->getFd(), &event));
+			if(replace) {
+				epoll_event nullEvent = { 0, { 0 } };
+				pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_DEL, what->getFd(), &nullEvent));
+			}
+			pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_ADD, what->getFd(), &event));
 		} else {
 			throw std::runtime_error("Engine is stopped.");
 		}
@@ -248,7 +264,6 @@ logDebug("stoped works");
 			Engine::theEngine->stop();
 		}
 	}
-
 
 	void
 	Engine::addTimer(const std::shared_ptr<TimeEvent>& what) {
@@ -316,40 +331,39 @@ logDebug("stoped works");
 		logDebug("Engine::doStop");
 		stopping = true;
 		if(epollTid != std::this_thread::get_id()) {
-			::pthread_kill(epollHandle, SIGINT);
+			::pthread_kill(epollHandle, SIGUSR2);
 		}
 	}
 
 	void
 	Engine::run(Socket& sock, const uint32_t events) const {
 		logDebug("Engine::Run " + pollEventsToString(events) + " " + std::to_string(sock.getFd()));
+		if((events & EPOLLOUT) != 0) {
+			sock.handleWrite();
+		}
+		if((events & (EPOLLIN)) != 0) {
+			sock.handleRead();
+		}
 		if((events & EPOLLRDHUP) != 0  || (events & EPOLLHUP) != 0 || (events & EPOLLERR) != 0) {
 			sock.handleError();
-		} else if((events & EPOLLIN) != 0) {
-			sock.handleRead();
-		} else if((events & EPOLLOUT) != 0) {
-			sock.handleWrite();
 		}
 	}
 
-
-	void Engine::syncChronise()	{
+	void Engine::sync()	{
 		std::lock_guard<std::mutex> sync(evHashLock);
 	}
 
 	void Engine::worker(Worker& me) {
 		try {
-			syncChronise();
+		sync();
 			for(;;) {
-				me.stats.MarkIdleStart();
 				sem.wait();
-				me.stats.MarkIdleEnd();
-				bool noEvents = true;
-				auto& event  = eventQueue.removeAndIsEmpty(noEvents);
-				if(noEvents) {
+				auto eq = eventQueue.removeAndIsEmpty();
+				if(eq.second) {
 					logDebug("Run without event");
 					continue;
 				}
+				auto event = eq.first;
 				if(event.epollEvent() == nullptr) {
 					if(event.epollEvents() == 0) {
 						break;
@@ -365,6 +379,7 @@ logDebug("stoped works");
 			}
 		} catch(std::exception& e) {
 			logError(std::string("Engine::worker threw a ") + e.what());
+			__builtin_trap();
 			Engine::theEngine->stop();
 		} catch(...) {
 			logError("Unknown exception in Engine::worker");
@@ -419,7 +434,7 @@ logDebug("stoped works");
 
 	void Engine::interrupt(Worker &thread) const {
 		if(!thread.exited && thread.thread.native_handle() != 0) {
-			::pthread_kill(thread.thread.native_handle(), SIGINT);
+			::pthread_kill(thread.thread.native_handle(), SIGUSR2);
 		}
 	}
 }

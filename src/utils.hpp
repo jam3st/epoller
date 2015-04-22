@@ -9,7 +9,7 @@
 
 
 namespace Sb {
-	const int numBitsPerByte = 8;
+	constexpr size_t numBitsPerByte = 8;
 
 	InetDest destFromString(const std::string& dest, const uint16_t port);
 
@@ -18,15 +18,14 @@ namespace Sb {
 	void pErrorLog(const int error);
 	std::string pollEventsToString(const uint32_t events);
 
+	std::string toHexString(Bytes const& src);
+
 	template< typename T >
 	std::string intToHexString(const T number) {
+//		constexpr bool needsCast = sizeof(T) < sizeof(size_t);
 		std::stringstream stream;
-		stream << "0x"
-			   << std::setfill ('0') << std::setw(sizeof(T) * 2)
-			   << std::hex << number;
-		  return stream.str();
+		stream << "0x" << std::setfill('0') << std::setw(sizeof(T) * 2) << std::hex << number;
+		return stream.str();
 	}
-
-	Bytes stringToBytes(const std::string src);
 }
 

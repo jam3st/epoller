@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <vector>
 #include <mutex>
+#include <utility>
 #include "utils.hpp"
 #include "resouces.hpp"
 
@@ -8,7 +9,7 @@ namespace Sb {
 	template<typename T>
 	class SyncVec {
 		public:
-			SyncVec(const T& sentinel)
+			SyncVec(T sentinel)
 				: sentinel(sentinel) {
 				if(Resouces::pageSize() > sizeof (SyncVec<T>)) {
 					auto res = (Resouces::pageSize() - sizeof (SyncVec<T>)) / size;
@@ -21,37 +22,19 @@ namespace Sb {
 			~SyncVec() {
 			}
 
-			bool isEmpty() {
-				std::lock_guard<std::mutex> sync(lock);
-				return start == vec.size ();
-			}
-
-			void add(const T& src) {
+			void add(T src) {
 				std::lock_guard<std::mutex> sync(lock);
 				vec.push_back(src);
 			}
 
-			const T& addAndRemove(const T& src) {
+			std::pair<T, bool>
+			removeAndIsEmpty() {
 				std::lock_guard<std::mutex> sync(lock);
 				if(isEmptyUnlocked()) {
-					return src;
+					return std::make_pair(sentinel, true);
+				} else {
+					return std::make_pair(vec[start++], false);
 				}
-				vec.push_back(src);
-				return vec[start++];
-			}
-
-			const T& remove() {
-				std::lock_guard<std::mutex> sync(lock);
-				return vec[start++];
-			}
-
-			const T& removeAndIsEmpty(bool& isEmpty) {
-				std::lock_guard<std::mutex> sync(lock);
-				isEmpty = isEmptyUnlocked();
-				if(isEmpty) {
-					return sentinel;
-				}
-				return vec[start++];
 			}
 
 			int len() {

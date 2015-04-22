@@ -33,19 +33,19 @@ namespace Sb {
 		Logger::theLogger = nullptr;
 	}
 
-	void Logger::logCritical(const std::string what) {
+	void Logger::logCritical(const std::string& what) {
 		Logger::log(LogType::CRITICAL, what);
 	}
 
-	void Logger::logError(const std::string what) {
+	void Logger::logError(const std::string& what) {
 		Logger::log(LogType::ERROR, what);
 	}
 
-	void Logger::logWarn(const std::string what) {
+	void Logger::logWarn(const std::string& what) {
 		Logger::log(LogType::WARNING, what);
 	}
 
-	void Logger::logDebug(const std::string what) {
+	void Logger::logDebug(const std::string& what) {
 		Logger::log(LogType::DEBUG, what);
 	}
 

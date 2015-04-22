@@ -25,9 +25,10 @@ namespace Sb {
 			virtual void handleTimer(const size_t timerId) override;
 			virtual void resolved(const IpAddr& addr) override;
 			virtual void error() override;
-
+			void createStream();
 		private:
 			std::shared_ptr<TcpStreamIf> client;
 			uint16_t port;
+			bool added = false;
 	};
 }

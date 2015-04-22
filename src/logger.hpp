@@ -18,10 +18,10 @@ namespace Sb {
 			EVERYTHING
 		};
 
-		static void logCritical(const std::string what);
-		static void logError(const std::string what);
-		static void logWarn(const std::string what);
-		static void logDebug(const std::string what);
+		static void logCritical(const std::string& what);
+		static void logError(const std::string& what);
+		static void logWarn(const std::string& what);
+		static void logDebug(const std::string& what);
 
 		static void log(const LogType type, const std::string what);
 		static void setMask(const LogType  mask);

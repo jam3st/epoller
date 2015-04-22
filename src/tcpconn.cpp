@@ -7,17 +7,22 @@ namespace Sb {
 		void
 		create(const struct InetDest& dest, std::shared_ptr<TcpStreamIf> client) {
 			auto ref = std::make_shared<TcpConn>(client, dest.port);
-			logDebug("TcpConn::create() " + dest.toString());
-logDebug("resolved added " + dest.toString());
+			logDebug("TcpConn::create() " + dest.toString() + " " +  std::to_string(ref->getFd()));
 			ref->connect(dest);
 			Engine::add(ref);
 		}
 
-		void create(const std::string& dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client) {
-			logDebug("TcpConn::create() " + dest);
-			auto ref = std::make_shared<TcpConn>(client, port);
-			std::shared_ptr<ResolverIf> res = ref;
-			Engine::resolver().resolve(res, dest);
+		void
+		create(const std::string& dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client) {
+			InetDest inetDest = Socket::destFromString(dest, port);
+			if(inetDest.valid) {
+				create(inetDest, client);
+			} else {
+				auto ref = std::make_shared<TcpConn>(client, port);
+				logDebug("TcpConn::create() " + dest + " " + std::to_string(ref->getFd()));
+				std::shared_ptr<ResolverIf> res = ref;
+				Engine::resolver().resolve(res, dest);
+			}
 		}
 	}
 
@@ -32,48 +37,69 @@ logDebug("resolved added " + dest.toString());
 	TcpConn::~TcpConn() {
 		logDebug("TcpConn::~TcpConn() " + std::to_string(fd));
 		Engine::resolver().cancel(this);
+		auto ref = client;
+		if(ref != nullptr) {
+			ref->disconnected();
+		}
 	}
 
 	void
 	TcpConn::handleRead() {
-		logDebug("TcpListener::handleRead " + std::to_string(fd));
+		logDebug("TcpConn::handleRead " + std::to_string(fd));
+//		createStream();
+	}
+
+	void TcpConn::createStream() {
+		logDebug("TcpConn::createStream() " + intToHexString(client));
+		auto ref = client;
+		if(ref != nullptr) {
+			struct InetDest blah;
+			TcpStream::create(releaseFd(), blah, ref, true);
+			Engine::remove(this, true);
+			client = nullptr;
+		}
 	}
 
 	void
 	TcpConn::handleWrite() {
 		logDebug("TcpConn::handleWrite " + std::to_string(fd));
-		struct InetDest blah;
-		TcpStream::create(releaseFd(), blah, client, true);
-		Engine::remove(this, true);
-		logDebug("TcpConn::handleWrite()");
+		createStream();
 	}
 
 	void
 	TcpConn::handleError() {
 		logDebug("TcpConnector::handleError " + std::to_string(fd));
-		client->disconnected();
-		Engine::remove(this);
-		// TODO
+		if(added) {
+			added = false;
+			Engine::remove(this);
+		}
+		auto ref = client;
+		if(ref != nullptr) {
+			ref->disconnected();
+			client = nullptr;
+		}
 	}
 
 	void
 	TcpConn::handleTimer(const size_t timerId) {
 		logDebug("TcpConn::handleTimer " + std::to_string(timerId) + " " + std::to_string(fd));
-		// TODO
+		// TODO Engine::resolver().cancel(this);
 	}
 
 	void
 	TcpConn::resolved(const IpAddr& addr) {
 		logDebug("resolved addrress");
 		auto tmp = std::dynamic_pointer_cast<Socket>(ref());
-		InetDest dest { addr, port };
+		InetDest dest { addr, true, port };
 logDebug("resolved added " + dest.toString());
 		connect(dest);
 		Engine::add(tmp);
+		added = true;
 	}
 
 	void
 	TcpConn::error() {
-logDebug("TcpConn error");
+		logDebug("TcpConn resolver error, not connected");
+		handleError();
 	}
 }

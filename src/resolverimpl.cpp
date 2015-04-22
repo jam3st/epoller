@@ -41,15 +41,20 @@ namespace Sb {
 
 			virtual void connected(const InetDest& to) override {
 				logDebug("UdpResolver::connected " + to.toString());
-				auto sock = socket();
-				sock->setTimer(0, queryTimeout);
-				sock->queueWrite(to, Query::resolve(requestNo, name, qType));
+				auto sock = udpSocket.lock();
+				if(sock != nullptr) {
+					sock->setTimer(0, queryTimeout);
+					sock->queueWrite(to, Query::resolve(requestNo, name, qType));
+				}
 			}
 
 			virtual void received(const InetDest& from, const Bytes& w) override {
 				logDebug("UdpEcho::received " + from.toString() + " " + std::to_string(w.size()));
 				handler.requestComplete(requestNo, Query::decode(w));
-				socket()->disconnect();
+				auto sock = udpSocket.lock();
+				if(sock != nullptr) {
+					sock->disconnect();
+				}
 			}
 
 			virtual void notSent(const InetDest& to, const Bytes& w) override {
@@ -106,7 +111,7 @@ namespace Sb {
 		logDebug("Resolver::put " + std::to_string(ans.addr.size()));
 		for(const auto& addr : ans.addr) {
 			addrs.push_back(addr);
-InetDest dest { addr, 12444 };
+InetDest dest { addr, true, 12444 };
 logDebug("resolved added " + dest.toString());
 		}
 	}
@@ -178,7 +183,6 @@ logDebug("resolved added " + dest.toString());
 			logDebug("is valid " + ans.name);
 			logDebug("is valid " + std::to_string(ans.valid));
 			if(ans.valid) {
-
 				auto bn = byName.find(ans.name);
 				if(bn == byName.end()) {
 					logDebug("adding new name" + ans.name);
@@ -193,6 +197,7 @@ logDebug("resolved added " + dest.toString());
 			logDebug("fully resolved " + std::to_string(ans.reqNo));
 			auto bn = byName.find(ans.name);
 			if(bn == byName.end()) {
+				logDebug("name not found at all " + ans.name);
 				client->error();
 			} else {
 				IpAddr ipAddr;

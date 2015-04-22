@@ -15,11 +15,8 @@ namespace Sb {
 			virtual void writeComplete() = 0;
 			virtual void disconnected() = 0;
 			virtual void timeout(const size_t timerId) = 0;
-			virtual const std::shared_ptr<UdpSocket> socket() const {
-				return udpSocket;
-			}
-		private:
-			std::shared_ptr<UdpSocket> udpSocket;
+		protected:
+			std::weak_ptr<UdpSocket> udpSocket;
 	};
 
 	class UdpSocket final : virtual public Socket {
