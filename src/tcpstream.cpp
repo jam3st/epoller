@@ -62,17 +62,19 @@ namespace Sb {
 		if(waitingWriteEvent && !fromTrigger) {
 			logDebug("TcpStream::writeHandler() write alread triggered  " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
 		} else {
-			logDebug("TcpStream::writeHandler() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
-			auto data = writeQueue.removeAndIsEmpty();
-			if (data.second) {
-				logDebug("write queue is empty notifying client");
-				notify = true;
-				if(fromTrigger) {
+            bool canWriteMore = false;
+            do {
+                logDebug("TcpStream::writeHandler() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
+                auto data = writeQueue.removeAndIsEmpty();
+                if (data.second) {
+                    logDebug("write queue is empty notifying client");
+                    notify = true;
 					waitingWriteEvent = false;
-				}
-			} else {
-				doWrite(data.first);
-			}
+                    canWriteMore = false;
+                } else {
+                    canWriteMore = doWrite(data.first);
+                }
+            } while(canWriteMore);
 		}
 		return notify;
 	}
@@ -116,31 +118,32 @@ namespace Sb {
 		client->timeout(timerId);
 	}
 
-	void TcpStream::doWrite(Bytes const& data) {
+	bool TcpStream::doWrite(Bytes const& data) {
 		logDebug(std::string("TcpStream::doWrite writing " + std::to_string(data.size())) + " "  + std::to_string(fd));
-		const auto actuallySent = write(data);
+        bool canWriteMore = false;
+
+        const auto actuallySent = write(data);
+
 		logDebug(std::string("TcpStream::doWrite actually wrote " + std::to_string(actuallySent)
 				 + " out of " + std::to_string(data.size()) + " on " + std::to_string(fd)));
 		pErrorLog(getFd());
 		if(actuallySent == -1 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
 			logDebug(std::string("TcpStream::queueWrite would block"));
 			waitingWriteEvent = true;
-
 			writeQueue.add(data);
-			return;
-		}
-		if(actuallySent < 0) {
+		} else if(actuallySent < 0) {
 			logDebug(std::string("TcpStream::write failed"));
-			return;
-		}
-
-		const decltype(actuallySent) dataLen = data.size();
-
-		if(actuallySent == dataLen) {
-			logDebug("Write " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen) + " on " + std::to_string(getFd()));
-		} else if (actuallySent > 0) {
-			logDebug("Partial write of " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen));
-			writeQueue.add(Bytes(data.begin () + actuallySent, data.end ()));
-		}
-	}
+		} else {
+			const decltype(actuallySent) dataLen = data.size();
+			if(actuallySent == dataLen) {
+				logDebug("Write " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen) + " on " + std::to_string(getFd()));
+                canWriteMore = true;
+			} else if (actuallySent > 0) {
+				logDebug("Partial write of " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen));
+				writeQueue.add(Bytes(data.begin () + actuallySent, data.end ()));
+			}
+	    }
+        return canWriteMore;
+    }
 }
+

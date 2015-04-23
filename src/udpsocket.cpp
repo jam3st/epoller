@@ -1,6 +1,4 @@
 ﻿#include "udpsocket.hpp"
-#include "utils.hpp"
-#include "types.hpp"
 #include "engine.hpp"
 
 namespace Sb {
@@ -35,6 +33,7 @@ namespace Sb {
 	}
 
 	void UdpSocket::handleRead() {
+		std::lock_guard<std::mutex> sync(readLock);
 		logDebug("UdpClient::handleRead");
 		Bytes data(MAX_PACKET_SIZE);
 		InetDest from = { { {} }, 0 };
@@ -48,12 +47,10 @@ namespace Sb {
 
 	void UdpSocket::queueWrite(const InetDest& dest, const Bytes& data) {
 		logDebug("UdpSocket::queueWrite() " + dest.toString() + " " + std::to_string(fd));
+		logDebug("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 		std::lock_guard<std::mutex> sync(writeLock);
-//		auto wasEmpty = writeQueue.isEmpty();
-//		writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data)));
-//		if(wasEmpty) {
-//			handleWrite();
-//		}
+		writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data)));
+		handleWrite();
 	}
 
 

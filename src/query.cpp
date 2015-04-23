@@ -1,7 +1,8 @@
 ﻿#include "query.hpp"
 #include "endians.hpp"
 #include "logger.hpp"
-#include <iostream>
+#include "utils.hpp"
+
 
 namespace Sb {
 	namespace {
@@ -291,6 +292,7 @@ std::cerr << "hd " << header.d[i] << std::endl;
 
 		Qanswer
 		decode(const std::vector<uint8_t>& data) {
+			logDebug("decode begin" + toHexString(data) + "decode end");
 			Qanswer reply;
 			reply.valid = false;
 			reply.timeStamp = SteadyClock::now();
@@ -332,6 +334,7 @@ logDebug("resolved added " + dest.toString());
 						reply.valid = true;
 					}
 				}
+				curPos += answer.rdlength;
 			}
 			return reply;
 		}

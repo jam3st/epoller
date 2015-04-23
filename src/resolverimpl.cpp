@@ -185,7 +185,7 @@ logDebug("resolved added " + dest.toString());
 			if(ans.valid) {
 				auto bn = byName.find(ans.name);
 				if(bn == byName.end()) {
-					logDebug("adding new name" + ans.name);
+					logDebug("adding new name " + ans.name);
 					byName.insert(std::make_pair(ans.name, Names() ));
 					bn = byName.find(ans.name);
 				}

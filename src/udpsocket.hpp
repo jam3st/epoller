@@ -26,17 +26,18 @@ namespace Sb {
 			void queueWrite(const InetDest& dest, const Bytes& data);
 			void disconnect();
 			virtual ~UdpSocket();
-			void handleRead();
-			void handleWrite();
-			void handleError();
-			void handleTimer(const size_t timerId);
+			virtual void handleRead() override;
+			virtual void handleWrite() override;
+			virtual void handleError() override;
+			virtual void handleTimer(const size_t timerId) override;
 			void doWrite(const InetDest& dest, const Bytes& data);
 			UdpSocket(std::shared_ptr<UdpSocketIf> client);
 		private:
-			void createStream(const int newFd);
 			std::shared_ptr<UdpSocketIf> client;
-			InetDest myDest;
+//			InetDest myDest;
 			std::mutex writeLock;
+			std::mutex readLock;
+//			bool waitingWriteEvent;
 			SyncVec<std::pair<const InetDest, const Bytes>> writeQueue;
 	};
 }

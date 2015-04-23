@@ -24,7 +24,7 @@ namespace Sb {
 			};
 			void init();
 			void resolve(std::shared_ptr<ResolverIf> client, const std::string&, const AddrPref& prefs = AddrPref::AnyAddr,
-						 const NanoSecs& timeout = NanoSecs { 2'000'000'000 }, const InetDest& nameServer = Socket::destFromString("::ffff:127.0.0.1", 53) );
+						 const NanoSecs& timeout = NanoSecs { 2'000'000'000 }, const InetDest& nameServer = Socket::destFromString("127.0.0.1", 53) );
 			void cancel(const ResolverIf* client);
 		private:
 			void destroy();

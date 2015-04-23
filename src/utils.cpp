@@ -85,14 +85,19 @@ __builtin_trap();
 	std::string toHexString(Bytes const& src) {
 		constexpr auto numPerLine = 32;
 		std::stringstream stream;
-		stream << std::setfill('0') << std::setw(8) << std::hex << 0;
-		for(size_t i = 0; i < src.size() / numPerLine; ++i) {
-			auto rowStartPos = i * numPerLine;
-			stream << ":";
-			for(size_t j = rowStartPos; j < src.size() && j < rowStartPos + numPerLine; ++j) {
-				stream << " " << std::setw(2) <<  std::setfill('0') << std::hex << static_cast<size_t >(src.at(j));
+		stream << std::endl << std::setfill('0') << std::setw(8) << std::hex << 0;
+		if(src.size() > 0 ) {
+			for(size_t i = 0; i < (src.size() - 1) / numPerLine + 1; ++i) {
+				auto rowStartPos = i * numPerLine;
+				stream << ":";
+				for(size_t j = rowStartPos; j < src.size() && j < rowStartPos + numPerLine; j += 2) {
+					stream << " " << std::setw(2) <<  std::setfill('0') << std::hex << static_cast<size_t >(src.at(j));
+					if( (j + 1) < src.size() ) {
+						stream << std::setw(2) << std::setfill('0') << std::hex << static_cast<size_t >(src.at(j + 1));
+					}
+				}
+				stream << std::endl << std::setfill('0') << std::setw(8) << std::hex << (i + 1) * numPerLine;
 			}
-			stream << std::endl << std::setfill('0') << std::setw(8) << std::hex << (i + 1) * numPerLine;
 		}
 		stream << std::endl;
 		return stream.str();

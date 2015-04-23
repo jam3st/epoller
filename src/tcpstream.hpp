@@ -29,7 +29,7 @@ namespace Sb {
 			virtual ~TcpStream();
 
 		protected:
-			void doWrite(Bytes const& data);
+			bool doWrite(Bytes const& data);
 			virtual void handleRead() override;
 			virtual void handleWrite() override;
 			virtual void handleError() override;
@@ -45,7 +45,6 @@ namespace Sb {
 			std::mutex readLock;
 			bool waitingWriteEvent;
 			SyncVec<Bytes> writeQueue;
-
 			bool disconnected = false;
 	};
 }

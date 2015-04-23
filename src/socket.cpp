@@ -1,4 +1,5 @@
 ﻿#include <arpa/inet.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
@@ -50,6 +51,10 @@ namespace Sb {
 
 	int Socket::createSocket(const Socket::SockType type) {
 		int fd = ::socket(AF_INET6, type == UDP ? SOCK_DGRAM : SOCK_STREAM  | SOCK_NONBLOCK, 0);
+		if(type == TCP) {
+			size_t one = 1;
+			setsockopt(fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+		}
 		makeNonBlocking(fd);
 		return fd;
 	}

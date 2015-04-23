@@ -1,6 +1,6 @@
 CXX           = clang++
-CFLAGS        = -pipe -flto -O3 -Wall -Werror -fvisibility=hidden -fvisibility-inlines-hidden
-CXXFLAGS      = $(CFLAGS) -std=c++14 -fexceptions -pthread
+CFLAGS        = -pipe -flto -O2 -Wall -Werror -fvisibility=hidden -fvisibility-inlines-hidden
+CXXFLAGS      = $(CFLAGS) -std=c++14 -pthread
 INCPATH       = -I../src `pkg-config --cflags botan`
 LINK          = $(CXX) -s
 LFLAGS        = $(CXXFLAGS)
@@ -23,7 +23,7 @@ SB_HDRS = \
 		timeevent.hpp timers.hpp tlsclientwrapper.hpp tlscredentials.hpp tlstcpstream.hpp types.hpp \
 		udpsocket.hpp utils.hpp
 
-TEST_EXE    = switchblade
+TEST_EXE    = pollax 
 SB_OBJS     = ${SB_SRCS:%.cpp=$(SB_OBJS_DIR)/%.o}
 TARGET      = $(BIN_DIR)/$(TEST_EXE)
 
