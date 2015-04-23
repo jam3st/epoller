@@ -256,7 +256,6 @@ std::cerr << "RCODE " << (int)header.h.reqFlags.rcode() << " TC " << header.h.re
 				curPos++;
 			}
 			curPos++;
-std::cerr << "name is " <<  name << std::endl;
 			return name;
 		}
 	}
@@ -265,7 +264,6 @@ std::cerr << "name is " <<  name << std::endl;
 		std::vector<uint8_t>
 		resolve(uint16_t reqNo, const std::string& name, Qtype qType)  {
 			QueryHeader header {};
-std::cerr << "size is " << sizeof(header.h.reqFlags) <<  " " << sizeof(header.d) << std::endl;
 			header.h.id = reqNo;
 			header.h.reqFlags.qr(Qr::Query);
 			header.h.reqFlags.opcode(Opcode::Query);
@@ -281,7 +279,6 @@ std::cerr << "size is " << sizeof(header.h.reqFlags) <<  " " << sizeof(header.d)
 			query.reserve(sizeof(header) + sizeof(footer) + 2 * name.length());
 			for(size_t i = 0; i < sizeof(header) / sizeof(header.d[0]); ++i) {
 				networkEndian(header.d[i], query);
-std::cerr << "hd " << header.d[i] << std::endl;
 			}
 			encodeName(name, query);
 			for(size_t i = 0; i < sizeof(footer) / sizeof(footer.d[0]); ++i) {
@@ -308,7 +305,6 @@ std::cerr << "hd " << header.d[i] << std::endl;
 				(void)decodeName(data, curPos);
 				Answer answer = decodeAnswer(data, curPos);
 				reply.ttl = NanoSecs(answer.ttl * NanoSecsInSecs);
-std::cerr << "Reply: " << std::to_string(i) << std::endl;
 				reply.timeStamp = SteadyClock::now();
 				if(answer.qclass == Qclass::Internet) {
 					if(answer.rdlength == 4 && answer.qtype == Qtype::A) {
@@ -325,9 +321,6 @@ std::cerr << "Reply: " << std::to_string(i) << std::endl;
 						addr[i + 2] = data[curPos + 2];
 						addr[i + 3] = data[curPos + 3];
 						reply.addr.push_back(addr);
-InetDest dest { addr, false, 12444 };
-logDebug("resolved added " + dest.toString());
-
 						reply.valid = true;
 					} else if(answer.rdlength == 16 && answer.qtype == Qtype::Aaaa) {
 						std::cerr << "IP6 ADDRESS IS " << networkEndian(data[curPos], data[curPos + 1], data[curPos + 2], data[curPos + 3]) << std::endl;
