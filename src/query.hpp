@@ -6,7 +6,7 @@
 #include "clock.hpp"
 
 namespace Sb {
-	namespace Query  {
+	namespace Query {
 		enum struct Qtype : uint16_t {
 			A = 1,
 			Ns = 2,
@@ -18,22 +18,22 @@ namespace Sb {
 			Aaaa = 28,
 			Srv = 33,
 			Ds = 43,
-			Rrsig  = 46,
+			Rrsig = 46,
 			Dnskey = 48,
-			Nsec3 =	50,
+			Nsec3 = 50,
 			Nsec3Param = 51,
 			Tlsa = 52,
 			Any = 255
 		};
 
 		struct Qanswer {
-			public:
-				bool valid;
-				std::uint16_t reqNo;
-				std::string name;
-				std::vector<IpAddr> addr;
-				NanoSecs ttl;
-				TimePointNs timeStamp;
+		public:
+			bool valid;
+			std::uint16_t reqNo;
+			std::string name;
+			std::vector<IpAddr> addr;
+			NanoSecs ttl;
+			TimePointNs timeStamp;
 		};
 
 		std::vector<uint8_t> resolve(uint16_t reqNo, const std::string& name, Qtype qType);

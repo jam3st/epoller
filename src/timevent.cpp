@@ -1,9 +1,5 @@
 ﻿#include "timeevent.hpp"
 #include "engine.hpp"
-#include "logger.hpp"
-#include "utils.hpp"
-#include <sys/epoll.h>
-#include <unistd.h>
 
 namespace Sb {
 	TimeEvent::TimeEvent() {
@@ -12,18 +8,26 @@ namespace Sb {
 	TimeEvent::~TimeEvent() {
 	}
 
-	void TimeEvent::setTimer(const int timerId, const NanoSecs& timeout) {
+	void TimeEvent::setTimer(Timer* const timerId, NanoSecs const& timeout) {
 		assert(timeout.count() > 0, " Epoll::setTimer timeout must be > 0");
-		logDebug("setTimer() " + std::to_string(timerId));
+		logDebug("setTimer()");
 		Engine::setTimer(this, timerId, timeout);
 	}
 
-	void TimeEvent::cancelTimer(const int timerId) {
-		logDebug("Epollable::cancelTimer() " + std::to_string(timerId));
+	void TimeEvent::cancelTimer(Timer* const timerId) {
+		logDebug("Epollable::cancelTimer()");
 		Engine::cancelTimer(this, timerId);
 	}
+
 	std::shared_ptr<TimeEvent> TimeEvent::ref() {
 		return shared_from_this();
+	}
+
+	Timer::Timer(std::function<void()> const& func) : func(func) {
+	}
+
+	void Timer::operator()() {
+		func();
 	}
 }
 

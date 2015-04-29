@@ -2,22 +2,17 @@
 
 #include "logger.hpp"
 #include "tcplistener.hpp"
-#include "tcpstream.hpp"
-#include "utils.hpp"
-
-
 
 namespace Sb {
 	void
 	TcpListener::create(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) {
 		auto tmp = std::make_shared<TcpListener>(port, clientFactory);
-		logDebug("TcpListener::create fd "	+ std::to_string(tmp->getFd()));
+		logDebug("TcpListener::create fd " + std::to_string(tmp->getFd()));
 		Engine::add(tmp);
 	}
 
-	TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory)
-		: Socket(Socket::createTcpSocket()),
-				clientFactory(clientFactory) {
+	TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) : Socket(Socket::createTcpSocket()),
+																												 clientFactory(clientFactory) {
 		logDebug(std::string("TcpListener::TcpListener " + std::to_string(port)));
 		reuseAddress();
 		bind(port);
@@ -48,11 +43,6 @@ namespace Sb {
 	void
 	TcpListener::handleError() {
 		logDebug("Epollable::handleWrite()");
-	}
-
-	void
-	TcpListener::handleTimer(const size_t timerId) {
-		logDebug("Epollable::handleTimer() " + std::to_string(timerId));
 	}
 
 	void TcpListener::createStream(const int connFd) {

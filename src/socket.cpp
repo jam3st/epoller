@@ -4,9 +4,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include "socket.hpp"
-#include "logger.hpp"
 #include "endians.hpp"
-
 
 namespace Sb {
 	typedef union {
@@ -14,10 +12,9 @@ namespace Sb {
 		struct sockaddr addr;
 	} SocketAddress;
 
-	static std::string addressToString(const SocketAddress &addr);
+	static std::string addressToString(const SocketAddress& addr);
 
-	Socket::Socket(const int fd)
-	 : fd(fd) {
+	Socket::Socket(const int fd) : fd(fd) {
 		pErrorThrow(fd);
 		assert(fd > 0, "Unitialised fd");
 		logDebug("Socket::Socket()");
@@ -50,7 +47,7 @@ namespace Sb {
 	}
 
 	int Socket::createSocket(const Socket::SockType type) {
-		int fd = ::socket(AF_INET6, type == UDP ? SOCK_DGRAM : SOCK_STREAM  | SOCK_NONBLOCK, 0);
+		int fd = ::socket(AF_INET6, type == UDP ? SOCK_DGRAM : SOCK_STREAM | SOCK_NONBLOCK, 0);
 		if(type == TCP) {
 			size_t one = 1;
 			setsockopt(fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
@@ -73,12 +70,12 @@ namespace Sb {
 	}
 
 	int Socket::read(Bytes& data) const {
-		logDebug("Asked to read with buffer size of  "  + std::to_string(data.size()) + " on " + std::to_string(fd));
+		logDebug("Asked to read with buffer size of " + std::to_string(data.size()) + " on " + std::to_string(fd));
 		int numRead = ::read(fd, &data[0], data.size());
 		pErrorLog(numRead);
-		logDebug("Read "  + std::to_string(numRead) + " on " + std::to_string(fd));
+		logDebug("Read " + std::to_string(numRead) + " on " + std::to_string(fd));
 		if(numRead >= 0 && (data.size() - numRead) > 0) {
-			logDebug("Resize "  + std::to_string(numRead));
+			logDebug("Resize " + std::to_string(numRead));
 			data.resize(numRead);
 		}
 		return numRead;
@@ -94,12 +91,12 @@ namespace Sb {
 		pErrorThrow(::listen(fd, LISTEN_MAX_PENDING));
 	}
 
-	int	Socket::accept() const {
+	int    Socket::accept() const {
 		SocketAddress addr;
 		socklen_t addrLen = sizeof addr.addrIn6;
 		int aFd = ::accept(fd, &addr.addr, &addrLen);
 		assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
-		logDebug("Accept connection from "  + addressToString(addr) + " on fd " + std::to_string(aFd));
+		logDebug("Accept connection from " + addressToString(addr) + " on fd " + std::to_string(aFd));
 		return aFd;
 	}
 
@@ -146,7 +143,7 @@ namespace Sb {
 		addr.addrIn6.sin6_port = networkEndian(whereTo.port);
 		::memcpy(&addr.addrIn6.sin6_addr, &whereTo.addr, sizeof addr.addrIn6.sin6_addr);
 		::connect(fd, &addr.addr, sizeof addr.addrIn6);
-		logDebug("Connect to "  + addressToString(addr) + ":" + std::to_string(whereTo.port) + " on fd " + std::to_string(fd));
+		logDebug("Connect to " + addressToString(addr) + ":" + std::to_string(whereTo.port) + " on fd " + std::to_string(fd));
 	}
 
 	InetDest Socket::destFromString(const std::string& where, const uint16_t port) {
@@ -162,7 +159,7 @@ namespace Sb {
 		return dest;
 	}
 
-	std::string addressToString(const SocketAddress &addr) {
+	std::string addressToString(const SocketAddress& addr) {
 		char buf[INET6_ADDRSTRLEN];
 		inet_ntop(AF_INET6, &addr.addrIn6.sin6_addr, buf, sizeof buf);
 		return std::string(buf);

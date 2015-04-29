@@ -1,10 +1,11 @@
-CXX           = clang++
-CFLAGS        = -pipe -flto -O2 -Wall -Werror -fvisibility=hidden -fvisibility-inlines-hidden
+#CXX           = clang++
+CXX           = g++
+CFLAGS        = -pipe -flto -fuse-linker-plugin -O2 -march=haswell -mcx16 -msahf -mmovbe -maes -mpclmul -mpopcnt -mabm -mno-lwp -mfma -mno-fma4 -mno-xop -mbmi -mbmi2 -mno-tbm -mavx -mavx2 -msse4.2 -msse4.1 -mlzcnt -mrtm -mhle -mrdrnd -mf16c -mfsgsbase -mno-rdseed -mno-prfchw -mno-adx -mfxsr -mxsave -mxsaveopt --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=8192 -mtune=haswell -fomit-frame-pointer -foptimize-register-move -fgcse-after-reload -fpredictive-commoning -ftree-loop-distribution -minline-all-stringops -fprefetch-loop-arrays -fno-tree-pre -fstrength-reduce -fexpensive-optimizations -floop-parallelize-all -floop-parallelize-all -ftree-parallelize-loops=8 -floop-interchange -Wall -Werror -fvisibility=hidden -fvisibility-inlines-hidden
 CXXFLAGS      = $(CFLAGS) -std=c++14 -pthread
-INCPATH       = -I../src `pkg-config --cflags botan`
+INCPATH       = -I../src
 LINK          = $(CXX) -s
-LFLAGS        = $(CXXFLAGS)
-LIBS          = `pkg-config --libs  botan`
+LFLAGS        = $(CXXFLAGS) -ltcmalloc
+LIBS          = 
 
 BUILD_DIR     = ../build
 
@@ -14,7 +15,7 @@ SB_OBJS_DIR = $(BUILD_DIR)/objs
 SB_SRC_DIR   = .
 
 SB_SRCS = main.cpp \
-		clock.cpp logger.cpp engine.cpp stats.cpp enc_ocb.cpp tcplistener.cpp utils.cpp tcpstream.cpp \
+		clock.cpp logger.cpp engine.cpp  enc_ocb.cpp tcplistener.cpp utils.cpp tcpstream.cpp \
 		tlstcpstream.cpp tlscredentials.cpp tlsclientwrapper.cpp socket.cpp tcpconn.cpp semaphore.cpp \
 		timers.cpp timevent.cpp resouces.cpp udpsocket.cpp query.cpp  resolverimpl.cpp  resolver.cpp
 SB_HDRS = \
@@ -30,7 +31,7 @@ TARGET      = $(BIN_DIR)/$(TEST_EXE)
 all: $(TARGET) $(COV_OUTS)
 
 $(SB_OBJS_DIR)/%.o: $(SB_SRC_DIR)/%.cpp | $(SB_OBJS_DIR)
-	$(CXX) -c $(CXXFLAGS) $(INCPATH) --analyze -o "$@".plist "$<"
+#	$(CXX) -c $(CXXFLAGS) $(INCPATH) --analyze -o "$@".plist "$<"
 	$(CXX) -MMD -c $(CXXFLAGS) $(INCPATH) -o "$@" "$<"
 
 $(TARGET):  $(SB_OBJS) $(SB_OBJS) | $(BIN_DIR)

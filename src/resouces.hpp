@@ -2,9 +2,7 @@
 
 namespace Sb {
 	class Resouces {
-		public:
-			static size_t pageSize();
-		private:
-			static size_t pageSize_;
+	public:
+		static size_t const pageSize;
 	};
 }

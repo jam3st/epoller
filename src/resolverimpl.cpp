@@ -1,23 +1,22 @@
 ﻿#include <utility>
 #include "resolverimpl.hpp"
-#include "logger.hpp"
 #include "udpsocket.hpp"
 #include "engine.hpp"
 
 namespace Sb {
-	ResolverImpl::ResolverImpl()
-		: request(0) {
+	ResolverImpl::ResolverImpl() : request(0) {
 	}
 
 	ResolverImpl::~ResolverImpl() {
+		logDebug("ResolverImpl::~ResolverImpl");
+		std::lock_guard<std::mutex> sync(lock);
+		resQueries.clear();
 	}
 
-	inline
-	bool
-	isIpv4Addr(const IpAddr& addr) {
+	inline bool isIpv4Addr(const IpAddr& addr) {
 		const int prefixLen = 12;
-		std::array<uint8_t, prefixLen> ip4Pref { {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff} };
-		for(auto i = 0; i < prefixLen; ++i)	{
+		std::array<uint8_t, prefixLen> ip4Pref {{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff }};
+		for(auto i = 0; i < prefixLen; ++i) {
 			if(addr[i] != ip4Pref[i]) {
 				return false;
 			}
@@ -26,59 +25,56 @@ namespace Sb {
 	}
 
 	class UdpResolver : public UdpSocketIf {
-		public:
-			UdpResolver(QueryHandlerIf& handler, const uint16_t requestNo, const std::string& name, const NanoSecs& timeout, const Query::Qtype qType)
-				: handler(handler),
-				  requestNo(requestNo),
-				  name(name),
-				  queryTimeout(timeout),
-				  qType(qType) {
-			}
+	public:
+		UdpResolver(QueryHandlerIf& handler, const uint16_t requestNo, const std::string& name, const Query::Qtype qType) : handler(
+			handler), requestNo(requestNo), name(name), qType(qType) {
+		}
 
-			virtual void disconnected() override {
-				logDebug("UdpResolver::disconnected");
+		virtual void connected(const InetDest& to) override {
+			logDebug("UdpResolver::connected " + to.toString());
+			auto sock = udpSocket.lock();
+			if(sock) {
+				sock->queueWrite(to, Query::resolve(requestNo, name, qType));
 			}
+		}
 
-			virtual void connected(const InetDest& to) override {
-				logDebug("UdpResolver::connected " + to.toString());
-				auto sock = udpSocket.lock();
-				if(sock != nullptr) {
-					sock->setTimer(0, queryTimeout);
-					sock->queueWrite(to, Query::resolve(requestNo, name, qType));
-				}
-			}
+		virtual void received(const InetDest& from, const Bytes& w) override {
+			logDebug("UdpResolver::received " + from.toString() + " " + std::to_string(w.size()));
+			disconnect();
+			handler.requestComplete(requestNo, Query::decode(w));
+		}
 
-			virtual void received(const InetDest& from, const Bytes& w) override {
-				logDebug("UdpEcho::received " + from.toString() + " " + std::to_string(w.size()));
-				handler.requestComplete(requestNo, Query::decode(w));
-				auto sock = udpSocket.lock();
-				if(sock != nullptr) {
-					sock->disconnect();
-				}
-			}
+		virtual void notSent(const InetDest& to, const Bytes& w) override {
+			logDebug("UdpResolver::notSent " + to.toString() + " " + std::to_string(w.size()));
+			disconnect();
+			handler.requestError(requestNo);
+		}
+		virtual void writeComplete() override {
+			logDebug("UdpEcho::onWriteCompleted");
+		}
 
-			virtual void notSent(const InetDest& to, const Bytes& w) override {
-				logDebug("UdpEcho::notSent " + to.toString() + " " + std::to_string(w.size()));
-			}
-			virtual void writeComplete() override {
-				logDebug("UdpEcho::onWriteCompleted");
-			}
+		virtual void disconnected() override {
+			logDebug("UdpResolver::onWriteCompleted");
+		}
 
-			virtual void timeout(const size_t) override {
-				logDebug("UdpEcho::onTimerExpired");
+		virtual void disconnect() override {
+			logDebug("UdpResolver::onWriteCompleted");
+			auto sock = udpSocket.lock();
+			if (sock) {
+				sock->disconnect();
 			}
+		}
 
-		private:
-			QueryHandlerIf& handler;
-			const uint16_t requestNo;
-			const std::string name;
-			const NanoSecs queryTimeout;
-			const Query::Qtype qType;
+	private:
+		QueryHandlerIf& handler;
+		const uint16_t requestNo;
+		const std::string name;
+		const Query::Qtype qType;
 	};
 
 	bool
-	ResolverImpl::Names::get(const Resolver::AddrPref& prefs, IpAddr& addr) const {
-		addr =  IpAddr { {} };
+	ResolverImpl::Names::get(Resolver::AddrPref const& prefs, IpAddr& addr) const {
+		addr = IpAddr {{ }};
 		bool found = false;
 		bool once = false;
 		auto i = lastAccessIndex;
@@ -111,12 +107,15 @@ namespace Sb {
 		logDebug("Resolver::put " + std::to_string(ans.addr.size()));
 		for(const auto& addr : ans.addr) {
 			addrs.push_back(addr);
-InetDest dest { addr, true, 12444 };
-logDebug("resolved added " + dest.toString());
 		}
 	}
 
-	void ResolverImpl::resolve(std::shared_ptr<ResolverIf> client, const std::string& name, const Resolver::AddrPref& prefs, const NanoSecs& timeout, const InetDest& nameServer) {
+	void ResolverImpl::resolve(
+		std::shared_ptr<ResolverIf> client,
+		const std::string& name,
+		const Resolver::AddrPref& prefs,
+		const NanoSecs& timeout,
+		const InetDest& nameServer) {
 		std::lock_guard<std::mutex> sync(lock);
 
 		auto it = byName.find(name);
@@ -130,16 +129,20 @@ logDebug("resolved added " + dest.toString());
 			}
 		} else {
 			logDebug("adding request " + std::to_string(request));
-			requests[request] = { prefs, {} };
-			requests[request].prefs = prefs;
+			resQueries[request] = { prefs, { }, { }, std::make_unique<Timer>(std::bind(&ResolverImpl::queryTimedout, this, request)) };
+			resQueries[request].prefs = prefs;
 			if(prefs == Resolver::AddrPref::AnyAddr || prefs == Resolver::AddrPref::Ipv6Only) {
-				UdpSocket::create(nameServer, std::make_shared<UdpResolver>(*this, request, name, timeout, Query::Qtype::Aaaa));
-				requests[request].clients.push_back(client);
+				auto resolver = std::make_shared<UdpResolver>(*this, request, name, Query::Qtype::Aaaa);
+				UdpSocket::create(nameServer, resolver);
+				resQueries[request].clients.push_back(client);
 			}
 			if(prefs == Resolver::AddrPref::AnyAddr || prefs == Resolver::AddrPref::Ipv4Only) {
-				UdpSocket::create(nameServer, std::make_shared<UdpResolver>(*this, request, name, timeout, Query::Qtype::A));
-				requests[request].clients.push_back(client);
+				auto resolver = std::make_shared<UdpResolver>(*this, request, name, Query::Qtype::A);
+				resQueries[request].resolvers.push_back(resolver);
+				UdpSocket::create(nameServer, resolver);
+				resQueries[request].clients.push_back(client);
 			}
+			Engine::setTimer(this, resQueries[request].timeout.get(), timeout);
 			request++;
 		}
 	}
@@ -147,31 +150,53 @@ logDebug("resolved added " + dest.toString());
 	void
 	ResolverImpl::cancel(const ResolverIf* /*client*/) {
 		std::lock_guard<std::mutex> sync(lock);
-//		auto it = byName.find(&name);
+		//		auto it = byName.find(&name);
 	}
 
 	void
 	ResolverImpl::destroy() {
-		logDebug("ResolverImpl::destroy");
-		std::lock_guard<std::mutex> sync(lock);
-		requests.clear();
+
 	}
 
-	void
-	ResolverImpl::handleTimer(const size_t /*timerId*/) {
-//		client->timeout();
-	}
-
-	void
-	ResolverImpl::requestComplete(const std::uint16_t reqNo, const Query::Qanswer& ans) {
-		logDebug("requestComplete " + std::to_string(ans.reqNo));
+	void ResolverImpl::queryTimedout(std::uint16_t queryId) {
+		logDebug("ResolverImpl::queryTimedout " + std::to_string(queryId));
 		std::shared_ptr<ResolverIf> client;
-		Resolver::AddrPref prefs;
-		bool requestComplete = false;
 		{
 			std::lock_guard<std::mutex> sync(lock);
-			auto it = requests.find(reqNo);
-			if(it == requests.end()) {
+			auto it = resQueries.find(queryId);
+			if(it == resQueries.end()) {
+				logDebug("queryTimedout request not found: " + std::to_string(queryId));
+				return;
+			}
+			while(it != resQueries.end()) {
+				client = it->second.clients.back();
+				auto resolver = it->second.resolvers.back().lock();
+				if(resolver) {
+					resolver->disconnect();
+				}
+				resQueries.erase(it++);
+			}
+		}
+		client->error();
+	}
+
+	void ResolverImpl::requestError(uint16_t const reqNo) {
+		logDebug("ResolverImpl::requestError " + std::to_string(reqNo));
+
+	}
+
+	void
+	ResolverImpl::requestComplete(std::uint16_t const reqNo, Query::Qanswer const& ans) {
+		logDebug("ResolverImpl::requestComplete " + std::to_string(ans.reqNo));
+		std::shared_ptr<ResolverIf> client;
+		Resolver::AddrPref prefs;
+		IpAddr ipAddr;
+		bool requestComplete = false;
+		bool completedError = true;
+		{
+			std::lock_guard<std::mutex> sync(lock);
+			auto it = resQueries.find(reqNo);
+			if(it == resQueries.end()) {
 				logDebug("request not found: " + std::to_string(ans.reqNo));
 				return;
 			}
@@ -186,29 +211,40 @@ logDebug("resolved added " + dest.toString());
 				auto bn = byName.find(ans.name);
 				if(bn == byName.end()) {
 					logDebug("adding new name " + ans.name);
-					byName.insert(std::make_pair(ans.name, Names() ));
+					byName.insert(std::make_pair(ans.name, Names()));
 					bn = byName.find(ans.name);
 				}
 				bn->second.put(ans);
 			}
 			requestComplete = it->second.clients.size() == 0;
-		}
-		if(requestComplete) {
-			logDebug("fully resolved " + std::to_string(ans.reqNo));
-			auto bn = byName.find(ans.name);
-			if(bn == byName.end()) {
-				logDebug("name not found at all " + ans.name);
-				client->error();
-			} else {
-				IpAddr ipAddr;
-				if(bn->second.get(prefs, ipAddr)) {
-					client->resolved(ipAddr);
+			if(requestComplete) {
+				auto bn = byName.find(ans.name);
+				if(bn == byName.end()) {
+					logDebug("name not found at all " + ans.name);
+					completedError = true;
 				} else {
-					logDebug("name not found " + ans.name);
-					client->error();
+					if(bn->second.get(prefs, ipAddr)) {
+						completedError = false;
+					} else {
+						logDebug("name not found " + ans.name);
+						completedError = true;
+					}
 				}
+				Engine::cancelTimer(this, it->second.timeout.get());
+				resQueries.erase(it);
 			}
 		}
-
+		if(requestComplete) {
+			logDebug("request Complete " + std::to_string(ans.reqNo));
+			if(completedError) {
+				logDebug("request complete with error " + std::to_string(ans.reqNo));
+				client->error();
+			} else {
+				logDebug("request complete as " + toString(ipAddr) + std::to_string(ans.reqNo));
+				client->resolved(ipAddr);
+			}
+		} else {
+			logDebug("request inComplete " + std::to_string(ans.reqNo));
+		}
 	}
 }

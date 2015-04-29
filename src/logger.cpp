@@ -4,7 +4,7 @@
 #include "clock.hpp"
 
 namespace Sb {
-	Logger* Logger::theLogger = nullptr;
+	Logger*Logger::theLogger = nullptr;
 
 	Logger::Logger() {
 	}
@@ -15,7 +15,6 @@ namespace Sb {
 		}
 		Logger::theLogger = new Logger;
 	}
-
 
 	void Logger::setMask(const LogType mask) {
 		Logger::theLogger->doSetMask(mask);
@@ -65,11 +64,11 @@ namespace Sb {
 		int64_t nsecs = nowNs % NanoSecsInSecs;
 
 		lock.lock();
-		std::tm* local_time_now = std::localtime(&secs);
+		std::tm*local_time_now = std::localtime(&secs);
 		lock.unlock();
 
 		std::locale loc;
-		const std::time_put<char>& tmput = std::use_facet<std::time_put<char>>(loc);
+		const std::time_put<char>& tmput { std::use_facet<std::time_put<char>>(loc) };
 
 		std::stringbuf line;
 		std::ostream os(&line);
@@ -92,10 +91,8 @@ namespace Sb {
 			tid = Logger::threadIds.size() - 1;
 		}
 		lock.unlock();
-
 		os << " " << std::setw(2) << tid << " ";
 		os << what << "\n";
-
 		lock.lock();
 		std::cerr << line.str();
 		lock.unlock();

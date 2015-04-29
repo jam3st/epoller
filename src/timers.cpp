@@ -2,20 +2,16 @@
 #include "timers.hpp"
 #include "engine.hpp"
 
-
 namespace Sb {
-	Timers::Timers(const std::function<void (const NanoSecs& when)> armTimer)
-		: armTimer(armTimer) {
+	Timers::Timers(const std::function<void(const NanoSecs& when)> armTimer) : armTimer(armTimer) {
 	}
 
 	Timers::~Timers() {
 	}
 
-	std::pair<const TimeEvent*, const size_t>
+	std::pair<TimeEvent* const, Timer* const>
 	Timers::onTimerExpired() {
-		logDebug("doOnTimerExpired() BO: " +
-				 std::to_string(timersByOwner.size()) + " BD: " +
-				 std::to_string(timesByDate.size()));
+		logDebug("doOnTimerExpired() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
 		std::lock_guard<std::mutex> lock(timeLock);
 		auto ev = timesByDate.begin()->second.ep;
 		auto timerId = timesByDate.begin()->second.id;
@@ -25,11 +21,11 @@ namespace Sb {
 	}
 
 	TimePointNs
-	Timers::removeTimer(const TimeEvent* what, const size_t timerId) {
+	Timers::removeTimer(TimeEvent* const what, Timer* const timerId) {
 		auto iiByOwner = timersByOwner.equal_range(what);
 		TimePointNs prevTp = SteadyClock::now();
 		if(iiByOwner.first != iiByOwner.second) {
-			for_each(iiByOwner.first, iiByOwner.second, [&, timerId](const auto& bo) {
+			for_each(iiByOwner.first, iiByOwner.second, [ &, timerId ](const auto& bo) {
 				auto iiByDate = timesByDate.equal_range(bo.second.tp);
 				if(iiByDate.first != iiByDate.second) {
 					for(auto it = iiByDate.first; it != iiByDate.second; ++it) {
@@ -40,9 +36,9 @@ namespace Sb {
 					}
 				}
 			});
-			auto it = std::find_if(iiByOwner.first, iiByOwner.second, [&timerId](const auto& tp) {
+			auto it = std::find_if(iiByOwner.first, iiByOwner.second, [ &timerId ](const auto& tp) {
 				return timerId == tp.second.id;
-			} );
+			});
 
 			if(it != iiByOwner.second) {
 				prevTp = it->second.tp;
@@ -56,23 +52,18 @@ namespace Sb {
 	Timers::setTrigger() {
 		auto trigger = NanoSecs{ 0 };
 		if(timesByDate.size() > 0) {
-			trigger = std::max(NanoSecs{ 1 }, NanoSecs{ timesByDate.begin()->first -  SteadyClock::now() });
+			trigger = std::max(NanoSecs{ 1 }, NanoSecs{ timesByDate.begin()->first - SteadyClock::now() });
 		}
 		armTimer(trigger);
 	}
 
 	NanoSecs
-	Timers::cancelTimer(const TimeEvent* what, const size_t timerId) {
-		logDebug("Engine::doCancelTimer() for " + std::to_string(timerId));
-		logDebug("Engine::doCancelTimer() BO: " +
-				 std::to_string(timersByOwner.size()) + " BD: " +
-				 std::to_string(timesByDate.size()));
+	Timers::cancelTimer(TimeEvent* const what, Timer* const timerId) {
+		logDebug("Engine::doCancelTimer() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
 		std::lock_guard<std::mutex> sync(timeLock);
 		auto oldStart = timesByDate.begin();
 		auto timerCount = removeTimer(what, timerId) - SteadyClock::now();
-		logDebug("Engine::doCancelTimer() BO: " +
-				 std::to_string(timersByOwner.size()) + " BD: " +
-				 std::to_string(timesByDate.size()));
+		logDebug("Engine::doCancelTimer() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
 		if(oldStart != timesByDate.begin()) {
 			setTrigger();
 		}
@@ -80,50 +71,54 @@ namespace Sb {
 	}
 
 	NanoSecs
-	Timers::setTimer(const TimeEvent* what, const size_t timerId, const NanoSecs& timeout) {
-		logDebug("Engine::doSetTimer() BO: " +
-				 std::to_string(timersByOwner.size()) + " BD: " +
-				 std::to_string(timesByDate.size()));
-		logDebug("Timer::doSetTimer() for " + std::to_string(timerId) + " duration "
-				 + std::to_string(timeout.count()) + "ns");
+	Timers::setTimer(TimeEvent* const what, Timer* const timerId, const NanoSecs& timeout) {
+		logDebug("Engine::doSetTimer() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
+		logDebug("Timer::doSetTimer() if duration " + std::to_string(timeout.count()) + "ns");
 
 		auto now = SteadyClock::now();
 		TimePointNs when = now + timeout;
 		std::lock_guard<std::mutex> lock(timeLock);
-		auto oldStart = timesByDate.begin();
+		struct {
+			TimePointNs st;
+			TimeEvent*  ep;
+			Timer* id;
+		} oldStart  {
+			zeroTimePoint, nullptr, nullptr
+		}, newStart {
+			zeroTimePoint, nullptr, nullptr
+		};
+
+		if(timesByDate.begin() != timesByDate.end()) {
+			oldStart = { timesByDate.begin()->first, timesByDate.begin()->second.ep, timesByDate.begin()->second.id };
+		}
 		auto timerCount = removeTimer(what, timerId) - SteadyClock::now();
+
 		logDebug("Togo is " + std::to_string(timerCount.count()));
-		logDebug("Engine::doSetTimer() remove  BO: " +
-				 std::to_string(timersByOwner.size()) + " BD: " +
-				 std::to_string(timesByDate.size()));
-		timersByOwner.insert(std::make_pair(what,  TimerDateId { when, timerId }));
+		logDebug("Engine::doSetTimer() remove  BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
+		timersByOwner.insert(std::make_pair(what, TimerDateId { when, timerId }));
 		timesByDate.insert(std::make_pair(when, TimerEpollId { what, timerId }));
-		if(oldStart != timesByDate.begin()) {
+
+		newStart = { timesByDate.begin()->first, timesByDate.begin()->second.ep, timesByDate.begin()->second.id };
+		if(oldStart.id != newStart.id || oldStart.ep != newStart.ep || oldStart.st != newStart.st) {
 			setTrigger();
 		}
-		logDebug("Engine::doSetTimer() BO: " +
-				 std::to_string(timersByOwner.size()) + " BD: " +
-				 std::to_string(timesByDate.size()));
+		logDebug("Engine::doSetTimer() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
 		return timerCount;
-	}
+	};
 
-	void Timers::cancelAllTimers(const TimeEvent* what) {
-		logDebug("Timers::doCancelAllTimers() BO: " +
-				 std::to_string(timersByOwner.size()) + " BD: " +
-				 std::to_string(timesByDate.size()));
+	void Timers::cancelAllTimers(TimeEvent* const what) {
+		logDebug("Timers::doCancelAllTimers() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
 		std::lock_guard<std::mutex> sync(timeLock);
 		auto oldStart = timesByDate.begin();
 		auto iiByOwner = timersByOwner.equal_range(what);
-		for_each(iiByOwner.first, iiByOwner.second, [&](const auto& bo) {
-			 auto iiByDate = timesByDate.equal_range(bo.second.tp);
-			 timesByDate.erase(iiByDate.first, iiByDate.second);
+		for_each(iiByOwner.first, iiByOwner.second, [ & ](const auto& bo) {
+			auto iiByDate = timesByDate.equal_range(bo.second.tp);
+			timesByDate.erase(iiByDate.first, iiByDate.second);
 		});
 		timersByOwner.erase(iiByOwner.first, iiByOwner.second);
-		if(oldStart != timesByDate.begin()) {
+		if(timesByDate.begin() == timesByDate.end() || oldStart != timesByDate.begin()) {
 			setTrigger();
 		}
-		logDebug("Timers::doCancelAllTimers() BO: " +
-				 std::to_string(timersByOwner.size()) + " BD: "+
-				 std::to_string(timesByDate.size()));
+		logDebug("Timers::doCancelAllTimers() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
 	}
 }

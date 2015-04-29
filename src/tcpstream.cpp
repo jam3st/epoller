@@ -42,12 +42,12 @@ namespace Sb {
 				logDebug(std::string("TcpStream::handleRead would block " + std::to_string(fd)));
 				return;
 			}
-			auto tmp = client;
-			if(tmp == nullptr) {
+			auto ref = client;
+			if(ref == nullptr) {
 				logDebug("TcpStream::handleRead() client deleted.");
 				return;
 			}
-			tmp->received(data);
+			ref->received(data);
 			logDebug("On read completed " + std::to_string(getFd()));
 		}
 	}
@@ -66,13 +66,13 @@ namespace Sb {
             do {
                 logDebug("TcpStream::writeHandler() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
                 auto data = writeQueue.removeAndIsEmpty();
-                if (data.second) {
+				if(std::get<1>(data)) {
                     logDebug("write queue is empty notifying client");
                     notify = true;
 					waitingWriteEvent = false;
                     canWriteMore = false;
                 } else {
-                    canWriteMore = doWrite(data.first);
+                    canWriteMore = doWrite(std::get<0>(data));
                 }
             } while(canWriteMore);
 		}
@@ -112,11 +112,11 @@ namespace Sb {
 			}
 		}
 	}
-
-	void TcpStream::handleTimer(size_t const timerId) {
-		logDebug("TcpListener::handleTimer() " + std::to_string(timerId) + " " + std::to_string(fd));
-		client->timeout(timerId);
-	}
+	//
+	//	void TcpStream::handleTimer(size_t const timerId) {
+	//		logDebug("TcpListener::handleTimer() " + std::to_string(timerId) + " " + std::to_string(fd));
+	//		client->timeout(timerId);
+	//	}
 
 	bool TcpStream::doWrite(Bytes const& data) {
 		logDebug(std::string("TcpStream::doWrite writing " + std::to_string(data.size())) + " "  + std::to_string(fd));

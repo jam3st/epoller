@@ -13,14 +13,11 @@ namespace Sb {
 			uint8_t b[sizeof(d32)];
 		};
 
-		const bool bigEndian =   [] () {
-					   return U16Swap { 0xb000 }.b[0] == 0xb0;
+		const bool bigEndian = [ ]() {
+			return U16Swap { 0xb000 }.b[0] == 0xb0;
 		};
 
-
-		inline
-		uint16_t
-		networkEndian(const uint16_t d0) {
+		inline uint16_t networkEndian(const uint16_t d0) {
 			if(bigEndian) {
 				return bswap_16(d0);
 			} else {
@@ -28,9 +25,7 @@ namespace Sb {
 			}
 		}
 
-		inline
-		uint32_t
-		networkEndian(const uint32_t d0) {
+		inline uint32_t networkEndian(const uint32_t d0) {
 			if(bigEndian) {
 				return bswap_32(d0);
 			} else {
@@ -38,9 +33,7 @@ namespace Sb {
 			}
 		}
 
-		inline
-		uint64_t
-		networkEndian(const uint64_t d0) {
+		inline uint64_t networkEndian(const uint64_t d0) {
 			if(bigEndian) {
 				return bswap_64(d0);
 			} else {
@@ -48,10 +41,8 @@ namespace Sb {
 			}
 		}
 
-		inline
-		uint16_t
-		networkEndian(const uint8_t d0, const uint8_t d1) {
-			U16Swap tmp {};
+		inline uint16_t networkEndian(const uint8_t d0, const uint8_t d1) {
+			U16Swap tmp { };
 			if(bigEndian) {
 				tmp.b[1] = d0;
 				tmp.b[0] = d1;
@@ -62,9 +53,7 @@ namespace Sb {
 			return tmp.d16;
 		}
 
-		inline
-		void
-		networkEndian(const uint16_t d, std::vector<uint8_t>& stream) {
+		inline void networkEndian(const uint16_t d, std::vector<uint8_t>& stream) {
 			const U16Swap tmp { d };
 			if(bigEndian) {
 				stream.push_back(tmp.b[1]);
@@ -75,10 +64,8 @@ namespace Sb {
 			}
 		}
 
-		inline
-		uint32_t
-		networkEndian(const uint8_t d0, const uint8_t d1 ,const uint8_t d2, const uint8_t d3) {
-			U32Swap tmp {};
+		inline uint32_t networkEndian(const uint8_t d0, const uint8_t d1, const uint8_t d2, const uint8_t d3) {
+			U32Swap tmp { };
 			if(bigEndian) {
 				tmp.b[3] = d0;
 				tmp.b[2] = d1;

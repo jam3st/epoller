@@ -7,9 +7,15 @@ namespace Sb {
 	typedef std::chrono::seconds Seconds;
 	typedef std::chrono::steady_clock SteadyClock;
 	typedef std::chrono::time_point<SteadyClock, NanoSecs> TimePointNs;
-	constexpr int64_t NanoSecsInSecs = { 1'000'000'000 };
 
+	 TimePointNs const zeroTimePoint { std::chrono::duration_cast<NanoSecs>(NanoSecs{ 0 }) };
+	constexpr int64_t NanoSecsInSecs { 1'000'000'000 };
 	namespace Clock {
 		uint64_t now();
 	}
+
+//	class Something {
+//		int64_t nowNs = Clock::now();
+//		std::time_t secs;
+//	};
 }

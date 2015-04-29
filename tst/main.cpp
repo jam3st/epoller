@@ -210,15 +210,15 @@ class ResolveNameSy : public ResolverIf {
 };
 
 class ExitTimer : public TimeEvent {
-	void handleTimer(const size_t) override {
-std::cerr << "Exit" << std::endl;
+	void handleTimer()  {
+std::cerr << "ExitTimer" << std::endl;
 		Engine::removeTimer(this);
 	}
 };
 
 int main (const int, const char* const argv[]) {
 	::close(0);
-	runUnit("timer", [] () { auto ref = std::make_shared<ExitTimer>(); Engine::addTimer(ref); ref->setTimer(0, NanoSecs{1'000'000'000 }); });
+	runUnit("timer", [] () { auto ref = std::make_shared<ExitTimer>(); Engine::addTimer(ref); ref->setTimer(std::mem_fn(handleTimer), NanoSecs{1'000'000'000 }); });
 	runUnit("resolve", [] () { Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "www.google.com.au", Resolver::AddrPref::Ipv4Only); });
 	runUnit("httpproxy", [] () { TcpListener::create(1024, [] () { return std::make_shared<HttpProxy>(); } ); });
 

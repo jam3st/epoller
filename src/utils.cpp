@@ -1,16 +1,13 @@
 ﻿#include <string.h>
 #include <sys/epoll.h>
-#include <unistd.h>
-#include <fcntl.h>
 
 #include "utils.hpp"
-#include "logger.hpp"
 
 namespace Sb {
 	void assert(bool ok, const std::string error) {
 		if(!ok) {
 			logError(std::string("Assertion failed: ") + error);
-__builtin_trap();
+			__builtin_trap();
 			throw std::runtime_error(error);
 		}
 	}
@@ -19,7 +16,7 @@ __builtin_trap();
 		if(error < 0) {
 			auto errorText = ::strerror(errno);
 			logError(std::string("pErrorThrow: ") + errorText);
-	__builtin_trap();
+			__builtin_trap();
 			throw std::runtime_error(errorText);
 		}
 	}
@@ -67,14 +64,14 @@ __builtin_trap();
 	std::string pollEventsToString(const uint32_t events) {
 		std::stringstream stream;
 		auto isFirst = true;
-		for(int bitPos =  sizeof events * numBitsPerByte - 1; bitPos >= 0; bitPos--) {
+		for(int bitPos = sizeof events * numBitsPerByte - 1; bitPos >= 0; bitPos--) {
 			uint32_t mask = 1 << bitPos;
 			std::string eventName = pollEventToString(events & mask);
 			if(eventName.size() > 0) {
 				if(isFirst) {
 					isFirst = false;
 				} else {
-					stream <<  " | ";
+					stream << " | ";
 				}
 				stream << eventName;
 			}
@@ -86,13 +83,13 @@ __builtin_trap();
 		constexpr auto numPerLine = 32;
 		std::stringstream stream;
 		stream << std::endl << std::setfill('0') << std::setw(8) << std::hex << 0;
-		if(src.size() > 0 ) {
+		if(src.size() > 0) {
 			for(size_t i = 0; i < (src.size() - 1) / numPerLine + 1; ++i) {
 				auto rowStartPos = i * numPerLine;
 				stream << ":";
 				for(size_t j = rowStartPos; j < src.size() && j < rowStartPos + numPerLine; j += 2) {
-					stream << " " << std::setw(2) <<  std::setfill('0') << std::hex << static_cast<size_t >(src.at(j));
-					if( (j + 1) < src.size() ) {
+					stream << " " << std::setw(2) << std::setfill('0') << std::hex << static_cast<size_t >(src.at(j));
+					if((j + 1) < src.size()) {
 						stream << std::setw(2) << std::setfill('0') << std::hex << static_cast<size_t >(src.at(j + 1));
 					}
 				}

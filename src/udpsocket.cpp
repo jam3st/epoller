@@ -19,10 +19,9 @@ namespace Sb {
 		client->connected(dest);
 	}
 
-	UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf> client)
-		: Socket(Socket::createUdpSocket()),
-		  client(client),
-		  writeQueue(std::make_pair<const InetDest, const Bytes>( { { {} }, 0, false }, {})) {
+	UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf> client) :
+		Socket(Socket::createUdpSocket()), client(client), writeQueue(std::make_pair<const InetDest, const Bytes>({{{ }}, 0, false }, { })
+	) {
 		logDebug(std::string("UdpClient::UdpClient " + std::to_string(fd)));
 		pErrorThrow(fd);
 		Socket::makeNonBlocking(fd);
@@ -36,7 +35,7 @@ namespace Sb {
 		std::lock_guard<std::mutex> sync(readLock);
 		logDebug("UdpClient::handleRead");
 		Bytes data(MAX_PACKET_SIZE);
-		InetDest from = { { {} }, 0 };
+		InetDest from = {{{ }}, 0 };
 		const auto actuallyReceived = receiveDatagram(from, data);
 		if(actuallyReceived < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
 			logDebug("UdpClient::handleRead would block");
@@ -53,15 +52,13 @@ namespace Sb {
 		handleWrite();
 	}
 
-
 	void UdpSocket::disconnect() {
-		logDebug("UdpSocket::disconnect() my ref " + std::to_string(this->ref().use_count()) +
-				 " their refs " + std::to_string(client.use_count()));
+		logDebug("UdpSocket::disconnect() my ref " + std::to_string(this->ref().use_count()) + " their refs " + std::to_string(client.use_count()) + " " + std::to_string(fd));
 		Engine::remove(this);
 	}
 
 	void UdpSocket::doWrite(const InetDest& dest, const Bytes& data) {
-		logDebug(std::string("UdpSocket::doWrite writing " + dest.toString() +  " " + std::to_string(data.size())) + " "  + std::to_string(fd));
+		logDebug(std::string("UdpSocket::doWrite writing " + dest.toString() + " " + std::to_string(data.size())) + " " + std::to_string(fd));
 		const auto actuallySent = sendDatagram(dest, data);
 		logDebug(std::string("UdpSocket::doWrite actually wrote " + std::to_string(actuallySent)));
 		pErrorLog(getFd());
@@ -74,38 +71,33 @@ namespace Sb {
 				logDebug(std::string("UdpSocket::doWrite failed completely"));
 				client->notSent(dest, data);
 			}
-
 		}
 
 		decltype(actuallySent) dataLen = data.size();
 		if(actuallySent == dataLen) {
 			logDebug("Write " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen) + " on " + std::to_string(getFd()));
-		} else if (actuallySent > 0) {
+		} else if(actuallySent > 0) {
 			logDebug("Partial write of " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen));
-			writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data.begin () + actuallySent, data.end ())));
+			writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data.begin() + actuallySent, data.end())));
 		}
 	}
 
 	void UdpSocket::handleWrite() {
 		logDebug("UdpSocket::handleWrite() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
-		for(;;) {
+		for(; ;) {
 			auto data = writeQueue.removeAndIsEmpty();
-			if(data.second) {
+			if(std::get<1>(data)) {
 				logDebug("write queue is empty notifying client");
 				auto ref = this->ref();
 				client->writeComplete();
 				return;
 			}
-			doWrite(data.first.first, data.first.second);
+			doWrite(std::get<0>(data).first, std::get<0>(data).second);
 		}
 	}
 
 	void UdpSocket::handleError() {
 		logDebug("UdpSocket::handleError() is closed");
 		client->disconnected();
-	}
-
-	void UdpSocket::handleTimer(const size_t) {
-
 	}
 }
