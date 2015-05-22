@@ -53,14 +53,6 @@ class Remote : public TcpStreamIf {
                   logDebug("~Remote destroyed");
             }
 
-            virtual void connected() override {
-                  logDebug("Remote connected initial " + std::to_string(initWrite.size()));
-                  auto ref = tcpStream.lock();
-                  if(ref) {
-                        ref->queueWrite(initWrite);
-                  }
-            }
-
             virtual void disconnect() override {
                   logDebug("Remote disconnect");
                   auto ref = tcpStream.lock();
@@ -79,28 +71,29 @@ class Remote : public TcpStreamIf {
                   }
             }
 
+
             virtual void writeComplete() override {
                   logDebug("Remote onReadyToWrite");
             }
 
             virtual void disconnected() override {
                   logDebug("Remote onDisconnect");
-
-                  if(auto ref = ep.lock()) {
+                  auto ref = ep.lock();
+                  if(ref) {
                         ref->disconnect();
                   }
-
-                  logDebug("Remote onDisconnect ok");
             }
 
             void doWrite(const Bytes& x) {
                   auto ref = tcpStream.lock();
 
                   if(ref) {
+                        if(initWrite.size() > 0) {
+                              ref->queueWrite(initWrite);
+                              initWrite.resize(0);
+                        }
                         ref->queueWrite(x);
                   } else {
-                        logDebug("Remote doWrite deferred");
-
                         for(auto c : x) {
                               initWrite.push_back(c);
                         }
@@ -126,15 +119,11 @@ class HttpProxy : public TcpStreamIf {
                   logDebug("~HttpProxy destroyed");
             }
 
-            virtual void connected() override {
-                  logDebug("HttpProxy connected");
-            }
-
             virtual void disconnect() override {
                   logDebug("HttpProxy disconnect");
                   auto ref = tcpStream.lock();
 
-                  if(ref != nullptr) {
+                  if(ref) {
                         ref->disconnect();
                   }
             }
@@ -213,10 +202,10 @@ class HttpProxy : public TcpStreamIf {
                   if(port == 443) {
                         auto ref = tcpStream.lock();
 
-                        if(ref != nullptr) {
+                        if(ref) {
                               ref->queueWrite({ 'H', 'T', 'T', 'P', '/', '1', '.', '1', ' ', '2', '0', '0', ' ', 'O', 'K', '\r', '\n', '\r', '\n' });
                         } else {
-                              logDebug("HttpProxy tcpStream missing on connect");
+                              disconnected();
                         }
                   }
             }
@@ -229,7 +218,7 @@ class HttpProxy : public TcpStreamIf {
                   logDebug("HttpProxy::disconnected");
                   auto ref = ep.lock();
 
-                  if(ref != nullptr) {
+                  if(ref) {
                         ref->disconnect();
                   }
             }

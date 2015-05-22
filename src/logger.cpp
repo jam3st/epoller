@@ -47,7 +47,7 @@ namespace Sb {
       }
 
       void Logger::logDebug(const std::string& what) {
-//            Logger::log(LogType::DEBUG, what);
+            Logger::log(LogType::DEBUG, what);
       }
 
       void Logger::log(const LogType type, const std::string what) {

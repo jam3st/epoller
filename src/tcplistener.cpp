@@ -26,15 +26,17 @@ namespace Sb {
       void
       TcpListener::handleRead() {
             logDebug("TcpListener::handleRead");
-            const int connFd = accept();
-            pErrorLog(connFd, fd);
-
-            if(connFd < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
-                  logDebug("TcpListener::handleRead would block");
-                  return;
+            for(;;) {
+                  int const connFd = accept();
+                  if(connFd >= 0) {
+                        createStream(connFd);
+                  } else if(connFd == -1) {
+                        break;
+                  } else {
+                        continue;
+                  }
             }
 
-            createStream(connFd);
       }
 
       void
@@ -48,13 +50,7 @@ namespace Sb {
       }
 
       void TcpListener::createStream(const int connFd) {
-            logDebug("TcpListener::createStream " + std::to_string(connFd));
-
-            if(connFd < 0) {
-                  logError("Invalid connection fd in TcpListener::createStream");
-                  return;
-            }
-
-            TcpStream::create(connFd, clientFactory());
+            auto client = clientFactory();
+            TcpStream::create(connFd, client);
       }
 }

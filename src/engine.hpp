@@ -8,7 +8,7 @@
 #include "timeevent.hpp"
 #include "timers.hpp"
 #include "socket.hpp"
-#include "syncvec.hpp"
+#include "syncqueue.hpp"
 #include "timeevent.hpp"
 #include "resolver.hpp"
 
@@ -55,8 +55,8 @@ namespace Sb {
 
                   void doStop();
                   void doSignalHandler();
-                  void doSetTimer(TimeEvent* const owner, Timer* const timerId, NanoSecs const& timeout);
                   void doOnTimerExpired();
+                  NanoSecs doSetTimer(TimeEvent* const owner, Timer* const timerId, NanoSecs const& timeout);
                   NanoSecs doCancelTimer(TimeEvent* const owner, Timer* const timerId);
                   void doSetTrigger(const NanoSecs& timeout) const;
                   void doInit(int minWorkersPerCpu);
@@ -67,14 +67,14 @@ namespace Sb {
                   void doRemove(Socket* const what, const bool replace);
                   void doAddTimer(std::shared_ptr<TimeEvent> const& what);
                   void doRemoveTimer(TimeEvent* const what);
-
+                  std::shared_ptr<TimeEvent> getEvent(TimeEvent const* ev);
             private:
                   class EpollEvent final {
                         public:
-                              explicit EpollEvent(const Socket* what, uint32_t events) : what(what), events(events) {
+                              explicit EpollEvent(std::weak_ptr<TimeEvent> const what, uint32_t const events) : what(what), events(events) {
                               }
 
-                              TimeEvent const* epollEvent() const {
+                                    std::weak_ptr<TimeEvent> epollEvent() const {
                                     return what;
                               };
 
@@ -82,14 +82,13 @@ namespace Sb {
                                     return events;
                               };
                         private:
-                              const Socket* what;
-
-                              const uint32_t events;
+                              std::weak_ptr<TimeEvent> what;
+                              uint32_t const events;
                   };
 
                   static Engine* theEngine;
                   Semaphore sem;
-                  SyncVec<EpollEvent> eventQueue;
+                  SyncQueue<EpollEvent> eventQueue;
                   std::atomic_bool stopping;
                   std::atomic_int activeCount;
                   std::thread::id epollTid;
@@ -104,7 +103,7 @@ namespace Sb {
 
             private:
                   const std::size_t NUM_ENGINE_EVENTS = 1;
-                  const std::size_t MAX_SHUTDOWN_ATTEMPTS = 5;
-                  const std::size_t EPOLL_EVENTS_PER_RUN = 4;
+                  const std::size_t MAX_SHUTDOWN_ATTEMPTS = 500000;
+                  const std::size_t EPOLL_EVENTS_PER_RUN = 128;
       };
 }

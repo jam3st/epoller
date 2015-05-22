@@ -49,7 +49,7 @@ namespace Sb {
             logDebug("UdpSocket::queueWrite() " + dest.toString() + " " + std::to_string(fd));
             logDebug("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
             std::lock_guard<std::mutex> sync(writeLock);
-            writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data)));
+            writeQueue.addLast(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data)));
             handleWrite();
       }
 
@@ -67,7 +67,7 @@ namespace Sb {
             if(actuallySent == -1) {
                   if(errno == EWOULDBLOCK || errno == EAGAIN) {
                         logDebug(std::string("UdpSocket::doWrite would block"));
-                        writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data)));
+                        writeQueue.addLast(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data)));
                         return;
                   } else {
                         logDebug(std::string("UdpSocket::doWrite failed completely"));
@@ -81,7 +81,7 @@ namespace Sb {
                   logDebug("Write " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen) + " on " + std::to_string(getFd()));
             } else if(actuallySent > 0) {
                   logDebug("Partial write of " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen));
-                  writeQueue.add(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data.begin() + actuallySent, data.end())));
+                  writeQueue.addLast(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data.begin() + actuallySent, data.end())));
             }
       }
 

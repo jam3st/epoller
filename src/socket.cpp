@@ -75,37 +75,39 @@ namespace Sb {
             pErrorThrow(::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes), fd);
       }
 
-      int Socket::read(Bytes& data) const {
-            logDebug("Asked to read with buffer size of " + std::to_string(data.size()) + " on " + std::to_string(fd));
-            int numRead = ::read(fd, &data[0], data.size());
-            pErrorLog(numRead, fd);
-            logDebug("Read " + std::to_string(numRead) + " on " + std::to_string(fd));
-
-            if(numRead >= 0 && (data.size() - numRead) > 0) {
-                  logDebug("Resize " + std::to_string(numRead));
-                  data.resize(numRead);
+      ssize_t Socket::convertError(ssize_t const error) const {
+            if(error >= 0) {
+                  return error;
+            } else if (error == -1 && (errno == EINTR || errno == EAGAIN || error == EWOULDBLOCK)) {
+                  return -1;
+            } else {
+                  pErrorLog(error, fd);
+                  return -2;
             }
-
-            return numRead;
       }
 
-      int Socket::write(const Bytes& data) const {
-            int numWritten = ::write(fd, &data[0], data.size());
-            pErrorLog(numWritten, fd);
-            return numWritten;
+      ssize_t Socket::read(Bytes& data) const {
+            int numRead = ::read(fd, &data[0], data.size());
+            if(numRead >= 0 && (data.size() - numRead) > 0) {
+                  data.resize(numRead);
+            }
+            return convertError(numRead);
+      }
+
+      ssize_t Socket::write(const Bytes& data) const {
+            return convertError(::write(fd, &data[0], data.size()));
       }
 
       void Socket::listen() const {
             pErrorThrow(::listen(fd, LISTEN_MAX_PENDING), fd);
       }
 
-      int  Socket::accept() const {
+      int Socket::accept() const {
             SocketAddress addr;
             socklen_t addrLen = sizeof addr.addrIn6;
             int aFd = ::accept(fd, &addr.addr, &addrLen);
             assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
-            logDebug("Accept connection from " + addressToString(addr) + " on fd " + std::to_string(aFd));
-            return aFd;
+            return convertError(aFd);
       }
 
       int Socket::receiveDatagram(InetDest& whereFrom, Bytes& data) const {
@@ -150,7 +152,6 @@ namespace Sb {
       }
 
       void Socket::connect(const InetDest& whereTo) const {
-            logDebug("Connect to " + whereTo.toString() + " on fd " + std::to_string(fd));
             makeNonBlocking(fd);
             SocketAddress addr;
             addr.addrIn6.sin6_family = AF_INET6;

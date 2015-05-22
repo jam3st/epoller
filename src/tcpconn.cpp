@@ -47,10 +47,9 @@ namespace Sb {
 
       void TcpConn::createStream() {
             logDebug("TcpConn::createStream() " + intToHexString(client));
-            auto ref = client;
-
-            if(ref != nullptr) {
-                  TcpStream::create(releaseFd(), ref, true);
+            std::lock_guard<std::mutex> sync(lock);
+            if(client) {
+                  TcpStream::create(releaseFd(), client, true);
                   Engine::remove(this, true);
                   added = false;
                   client = nullptr;
@@ -66,24 +65,23 @@ namespace Sb {
       void
       TcpConn::handleError() {
             logDebug("TcpConn::handleError " + std::to_string(fd));
-
+            std::lock_guard<std::mutex> sync(lock);
             if(added) {
+                  added = false;
                   Engine::remove(this);
             }
 
-            auto ref = client;
-
-            if(ref != nullptr) {
-                  ref->disconnected();
+            if(client) {
+                  client->disconnected();
                   client = nullptr;
             }
       }
 
       void
       TcpConn::resolved(IpAddr const& addr) {
-            logDebug("resolved addrress");
             InetDest dest { addr, true, port };
             logDebug("resolved added " + dest.toString());
+            std::lock_guard<std::mutex> sync(lock);
             Engine::add(self);
             self = nullptr;
             added = true;

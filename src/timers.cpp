@@ -9,9 +9,7 @@ namespace Sb {
       Timers::~Timers() {
       }
 
-      std::pair<TimeEvent* const, Timer* const>
-      Timers::onTimerExpired() {
-            logDebug("doOnTimerExpired() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
+      std::pair<TimeEvent* const, Timer* const> Timers::onTimerExpired() {
             std::lock_guard<std::mutex> lock(timeLock);
             auto ev = timesByDate.begin()->second.ep;
             auto timerId = timesByDate.begin()->second.id;
@@ -20,8 +18,7 @@ namespace Sb {
             return std::make_pair(ev, timerId);
       }
 
-      TimePointNs
-      Timers::removeTimer(TimeEvent* const what, Timer* const timerId) {
+      TimePointNs Timers::removeTimer(TimeEvent* const what, Timer* const timerId) {
             auto iiByOwner = timersByOwner.equal_range(what);
             TimePointNs prevTp = SteadyClock::now();
 
@@ -47,12 +44,10 @@ namespace Sb {
                         timersByOwner.erase(it);
                   }
             }
-
             return prevTp;
       }
 
-      void
-      Timers::setTrigger() {
+      void Timers::setTrigger() {
             auto trigger = NanoSecs { 0 };
 
             if(timesByDate.size() > 0) {
@@ -62,13 +57,10 @@ namespace Sb {
             armTimer(trigger);
       }
 
-      NanoSecs
-      Timers::cancelTimer(TimeEvent* const what, Timer* const timerId) {
-            logDebug("Engine::doCancelTimer() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
+      NanoSecs Timers::cancelTimer(TimeEvent* const what, Timer* const timerId) {
             std::lock_guard<std::mutex> sync(timeLock);
             auto oldStart = timesByDate.begin();
             auto timerCount = removeTimer(what, timerId) - SteadyClock::now();
-            logDebug("Engine::doCancelTimer() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
 
             if(oldStart != timesByDate.begin()) {
                   setTrigger();
@@ -77,10 +69,7 @@ namespace Sb {
             return timerCount;
       }
 
-      NanoSecs
-      Timers::setTimer(TimeEvent* const what, Timer* const timerId, const NanoSecs& timeout) {
-            logDebug("Engine::doSetTimer() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
-            logDebug("Timer::doSetTimer() if duration " + std::to_string(timeout.count()) + "ns");
+      NanoSecs Timers::setTimer(TimeEvent* const what, Timer* const timerId, const NanoSecs& timeout) {
             auto now = SteadyClock::now();
             TimePointNs when = now + timeout;
             std::lock_guard<std::mutex> lock(timeLock);
@@ -99,8 +88,6 @@ namespace Sb {
             }
 
             auto timerCount = removeTimer(what, timerId) - SteadyClock::now();
-            logDebug("Togo is " + std::to_string(timerCount.count()));
-            logDebug("Engine::doSetTimer() remove  BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
             timersByOwner.insert(std::make_pair(what, TimerDateId { when, timerId }));
             timesByDate.insert(std::make_pair(when, TimerEpollId { what, timerId }));
             newStart = { timesByDate.begin()->first, timesByDate.begin()->second.ep, timesByDate.begin()->second.id };
@@ -108,13 +95,10 @@ namespace Sb {
             if(oldStart.id != newStart.id || oldStart.ep != newStart.ep || oldStart.st != newStart.st) {
                   setTrigger();
             }
-
-            logDebug("Engine::doSetTimer() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
             return timerCount;
       };
 
       void Timers::cancelAllTimers(TimeEvent* const what) {
-            logDebug("Timers::doCancelAllTimers() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
             std::lock_guard<std::mutex> sync(timeLock);
             auto oldStart = timesByDate.begin();
             auto iiByOwner = timersByOwner.equal_range(what);
@@ -127,7 +111,5 @@ namespace Sb {
             if(timesByDate.begin() == timesByDate.end() || oldStart != timesByDate.begin()) {
                   setTrigger();
             }
-
-            logDebug("Timers::doCancelAllTimers() BO: " + std::to_string(timersByOwner.size()) + " BD: " + std::to_string(timesByDate.size()));
       }
 }

@@ -2,7 +2,7 @@
 #include <atomic>
 #include <memory>
 #include "socket.hpp"
-#include "syncvec.hpp"
+#include "syncqueue.hpp"
 
 namespace Sb {
       class UdpSocket;
@@ -38,6 +38,6 @@ namespace Sb {
                   std::mutex writeLock;
                   std::mutex readLock;
                   //                bool waitingWriteEvent;
-                  SyncVec<std::pair<const InetDest, const Bytes>> writeQueue;
+                  SyncQueue<std::pair<const InetDest, const Bytes>> writeQueue;
       };
 }

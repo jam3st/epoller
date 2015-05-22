@@ -13,6 +13,11 @@ namespace Sb {
                   ~SyncQueue() {
                   }
 
+                  void clear() {
+                        std::lock_guard<std::mutex> sync(lock);
+                        queue.clear();
+                  }
+
                   void addLast(T src) {
                         std::lock_guard<std::mutex> sync(lock);
                         queue.push_back(src);
@@ -23,7 +28,7 @@ namespace Sb {
                         queue.push_front(src);
                   }
 
-            std::tuple<T, bool> removeAndIsEmpty() {
+                  std::tuple<T, bool> removeAndIsEmpty() {
                         std::lock_guard<std::mutex> sync(lock);
 
                         if(queue.empty()) {

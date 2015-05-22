@@ -32,14 +32,16 @@ namespace Sb {
                   void onReadComplete();
                   void onWriteComplete();
                   void reuseAddress() const;
-                  int read(Bytes& data) const;
-                  int write(const Bytes& data) const;
+                  ssize_t read(Bytes& data) const;
+                  ssize_t write(const Bytes& data) const;
                   void bind(const uint16_t port) const;
                   void connect(const InetDest& whereTo) const;
                   void listen() const;
                   int accept() const;
                   int receiveDatagram(InetDest& whereFrom, Bytes& data) const;
                   int sendDatagram(const InetDest& whereTo, const Bytes& data) const;
+            private:
+                  ssize_t convertError(ssize_t const error) const;
             private:
                   const int LISTEN_MAX_PENDING = 1;
       };

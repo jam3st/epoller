@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include <functional>
-#include "syncvec.hpp"
+#include "syncqueue.hpp"
 #include "engine.hpp"
 #include "socket.hpp"
 #include "types.hpp"
@@ -12,7 +12,6 @@ namespace Sb {
             public:
                   friend class TcpStream;
 
-                  virtual void connected() = 0;
                   virtual void disconnect() = 0;
                   virtual void received(const Bytes&) = 0;
                   virtual void writeComplete() = 0;
@@ -24,7 +23,7 @@ namespace Sb {
 
       class TcpStream : virtual public Socket {
             public:
-                  static void create(const int fd, std::shared_ptr<TcpStreamIf> client, const bool replace = false);
+                  static void create(const int fd, std::shared_ptr<TcpStreamIf>& client, const bool replace = false);
                   void queueWrite(const Bytes& data);
                   void disconnect();
                   TcpStream(const int fd, std::shared_ptr<TcpStreamIf>& client);
@@ -43,9 +42,12 @@ namespace Sb {
                   std::shared_ptr<TcpStreamIf> client;
                   std::mutex writeLock;
                   std::mutex readLock;
+                  std::mutex errorLock;
                   bool waitingWriteEvent;
-                  SyncVec<Bytes> writeQueue;
-                  bool disconnected = false;
+                  SyncQueue<Bytes> writeQueue;
+                  bool disconnected;
+                  bool readError;
+                  bool writeError;
       };
 }
 

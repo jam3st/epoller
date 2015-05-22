@@ -23,7 +23,7 @@ SB_SRCS = \
 		timers.cpp timevent.cpp resouces.cpp udpsocket.cpp query.cpp  resolverimpl.cpp  resolver.cpp
 SB_HDRS = \
 		clock.hpp engine.hpp logger.hpp query.hpp resolver.hpp resolverimpl.hpp resouces.hpp \
-		semaphore.hpp socket.hpp stats.hpp syncvec.hpp tcpconn.hpp tcplistener.hpp tcpstream.hpp \
+		semaphore.hpp socket.hpp stats.hpp syncqueue.hpp tcpconn.hpp tcplistener.hpp tcpstream.hpp \
 		timeevent.hpp timers.hpp tlsclientwrapper.hpp tlscredentials.hpp tlstcpstream.hpp types.hpp \
 		udpsocket.hpp utils.hpp
 

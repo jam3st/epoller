@@ -35,6 +35,7 @@ namespace Sb {
                   std::shared_ptr<TcpStreamIf> client;
                   uint16_t port;
                   std::shared_ptr<Socket> self;
-                  std::atomic_bool added;
+                  bool added;
+                  std::mutex lock;
       };
 }
