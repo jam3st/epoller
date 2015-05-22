@@ -1,10 +1,10 @@
 ﻿#pragma once
-#include "timeevent.hpp"
+#include "event.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 
 namespace Sb {
-      class Socket : virtual public TimeEvent {
+      class Socket : virtual public Runnable {
             public:
                   explicit Socket(const int fd);
                   static InetDest destFromString(const std::string& where, const uint16_t port);

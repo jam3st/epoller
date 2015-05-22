@@ -13,7 +13,7 @@ namespace Sb {
             thread.detach();
       }
 
-      Engine::Engine() : eventQueue(EpollEvent({}, 0)),
+      Engine::Engine() : eventQueue(Event({})),
             stopping(false),
             activeCount(0),
             epollTid(std::this_thread::get_id()),
@@ -131,7 +131,7 @@ namespace Sb {
             stopWorkers();
       }
 
-      void Engine::setTimer(TimeEvent* const owner, Timer* const timerId, NanoSecs const& timeout) {
+      void Engine::setTimer(Runnable * const owner, Event * const timerId, NanoSecs const& timeout) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Engine::setTimer Please call Engine::Init() first");
             }
@@ -139,11 +139,11 @@ namespace Sb {
             Engine::theEngine->doSetTimer(owner, timerId, timeout);
       }
 
-      NanoSecs Engine::doSetTimer(TimeEvent* const owner, Timer* const timerId, NanoSecs const& timeout) {
+      NanoSecs Engine::doSetTimer(Runnable * const owner, Event * const timerId, NanoSecs const& timeout) {
             return timers.setTimer(owner, timerId, timeout);
       }
 
-      NanoSecs Engine::cancelTimer(TimeEvent* const owner, Timer* const timerId) {
+      NanoSecs Engine::cancelTimer(Runnable * const owner, Event * const timerId) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Engine::cancelTimer Please call Engine::Init() first");
             }
@@ -151,7 +151,7 @@ namespace Sb {
             return Engine::theEngine->doCancelTimer(owner, timerId);
       }
 
-      NanoSecs Engine::doCancelTimer(TimeEvent* const owner, Timer* const timerId) {
+      NanoSecs Engine::doCancelTimer(Runnable * const owner, Event * const timerId) {
             auto ret = timers.cancelTimer(owner, timerId);
             return ret;
       }
@@ -164,8 +164,8 @@ namespace Sb {
             Engine::theEngine->doOnTimerExpired();
       }
 
-      std::shared_ptr<TimeEvent> Engine::getEvent(TimeEvent const* ev) {
-            std::shared_ptr<TimeEvent> ret;
+      std::shared_ptr<Runnable> Engine::getEvent(Runnable const* ev) {
+            std::shared_ptr<Runnable> ret;
             std::lock_guard<std::mutex> sync(evHashLock);
             auto it = eventHash.find(ev);
 
@@ -179,10 +179,10 @@ namespace Sb {
             uint64_t value;
             pErrorThrow(::read(timerFd, &value, sizeof(value)), timerFd);
             auto ev = timers.onTimerExpired();
-            std::shared_ptr<TimeEvent> ref = getEvent(ev.first);
+            std::shared_ptr<Runnable> ref = getEvent(ev.first);
             if(ref) {
                   auto togo = timers.cancelTimer(ev.first, ev.second);
-                  logDebug("Timer togo " + std::to_string(togo.count()));
+                  logDebug("Event togo " + std::to_string(togo.count()));
                   (*ev.second)();
             }
 
@@ -229,7 +229,7 @@ namespace Sb {
             }
       }
 
-      void Engine::doAddTimer(std::shared_ptr<TimeEvent> const& what) {
+      void Engine::doAddTimer(std::shared_ptr<Runnable> const& what) {
             bool found = false;
             {
                   std::lock_guard<std::mutex> sync(evHashLock);
@@ -245,7 +245,7 @@ namespace Sb {
             }
       }
 
-      void Engine::doRemoveTimer(TimeEvent* const what) {
+      void Engine::doRemoveTimer(Runnable * const what) {
             std::lock_guard<std::mutex> sync(evHashLock);
             auto it = eventHash.find(what);
             assert(it != eventHash.end(), "Not found for removal");
@@ -254,7 +254,7 @@ namespace Sb {
             eventHash.erase(it);
       }
 
-      void Engine::addTimer(const std::shared_ptr<TimeEvent>& what) {
+      void Engine::addTimer(const std::shared_ptr<Runnable>& what) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Please call Engine::Init() first");
             }
@@ -262,7 +262,7 @@ namespace Sb {
             theEngine->doAddTimer(what);
       }
 
-      void Engine::removeTimer(TimeEvent* const what) {
+      void Engine::removeTimer(Runnable * const what) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Please call Engine::Init() first");
             }
@@ -367,7 +367,7 @@ namespace Sb {
                                     activeCount--;
                               }
                         } else {
-                              std::shared_ptr<TimeEvent> ref = getEvent(event.epollEvent());
+                              std::shared_ptr<Runnable> ref = getEvent(event.epollEvent());
                               if(ref) {
                                     activeCount++;
                                     run(*dynamic_cast<Socket*>(ref.get()), event.epollEvents());

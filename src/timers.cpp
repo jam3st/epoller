@@ -9,7 +9,7 @@ namespace Sb {
       Timers::~Timers() {
       }
 
-      std::pair<TimeEvent* const, Timer* const> Timers::onTimerExpired() {
+      std::pair<Runnable * const, Event * const> Timers::onTimerExpired() {
             std::lock_guard<std::mutex> lock(timeLock);
             auto ev = timesByDate.begin()->second.ep;
             auto timerId = timesByDate.begin()->second.id;
@@ -18,7 +18,7 @@ namespace Sb {
             return std::make_pair(ev, timerId);
       }
 
-      TimePointNs Timers::removeTimer(TimeEvent* const what, Timer* const timerId) {
+      TimePointNs Timers::removeTimer(Runnable * const what, Event * const timerId) {
             auto iiByOwner = timersByOwner.equal_range(what);
             TimePointNs prevTp = SteadyClock::now();
 
@@ -57,7 +57,7 @@ namespace Sb {
             armTimer(trigger);
       }
 
-      NanoSecs Timers::cancelTimer(TimeEvent* const what, Timer* const timerId) {
+      NanoSecs Timers::cancelTimer(Runnable * const what, Event * const timerId) {
             std::lock_guard<std::mutex> sync(timeLock);
             auto oldStart = timesByDate.begin();
             auto timerCount = removeTimer(what, timerId) - SteadyClock::now();
@@ -69,14 +69,14 @@ namespace Sb {
             return timerCount;
       }
 
-      NanoSecs Timers::setTimer(TimeEvent* const what, Timer* const timerId, const NanoSecs& timeout) {
+      NanoSecs Timers::setTimer(Runnable * const what, Event * const timerId, const NanoSecs& timeout) {
             auto now = SteadyClock::now();
             TimePointNs when = now + timeout;
             std::lock_guard<std::mutex> lock(timeLock);
             struct {
                   TimePointNs st;
-                  TimeEvent*  ep;
-                  Timer* id;
+                  Runnable *  ep;
+                  Event * id;
             } oldStart  {
                   zeroTimePoint, nullptr, nullptr
             }, newStart {
@@ -98,7 +98,7 @@ namespace Sb {
             return timerCount;
       };
 
-      void Timers::cancelAllTimers(TimeEvent* const what) {
+      void Timers::cancelAllTimers(Runnable * const what) {
             std::lock_guard<std::mutex> sync(timeLock);
             auto oldStart = timesByDate.begin();
             auto iiByOwner = timersByOwner.equal_range(what);

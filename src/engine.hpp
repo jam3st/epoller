@@ -5,11 +5,11 @@
 #include <map>
 #include <unordered_map>
 #include "semaphore.hpp"
-#include "timeevent.hpp"
+#include "event.hpp"
 #include "timers.hpp"
 #include "socket.hpp"
 #include "syncqueue.hpp"
-#include "timeevent.hpp"
+#include "event.hpp"
 #include "resolver.hpp"
 
 namespace Sb {
@@ -18,13 +18,13 @@ namespace Sb {
                   static void start(int minWorkersPerCpu = 4);
                   static void stop();
                   static void init();
-                  static void addTimer(const std::shared_ptr<TimeEvent>& what);
-                  static void removeTimer(TimeEvent* const what);
+                  static void addTimer(const std::shared_ptr<Runnable>& what);
+                  static void removeTimer(Runnable * const what);
                   static void add(const std::shared_ptr<Socket>& what, const bool replace = false);
                   static void remove(Socket* const what, bool const replace = false);
                   static Resolver& resolver();
-                  static void setTimer(TimeEvent* const owner, Timer* const timerId, NanoSecs const& timeout);
-                  static NanoSecs cancelTimer(TimeEvent* const owner, Timer* const timerId);
+                  static void setTimer(Runnable * const owner, Event * const timerId, NanoSecs const& timeout);
+                  static NanoSecs cancelTimer(Runnable * const owner, Event * const timerId);
                   ~Engine();
                   void sync();
                   void startWorkers(int minWorkersPerCpu);
@@ -56,8 +56,8 @@ namespace Sb {
                   void doStop();
                   void doSignalHandler();
                   void doOnTimerExpired();
-                  NanoSecs doSetTimer(TimeEvent* const owner, Timer* const timerId, NanoSecs const& timeout);
-                  NanoSecs doCancelTimer(TimeEvent* const owner, Timer* const timerId);
+                  NanoSecs doSetTimer(Runnable * const owner, Event * const timerId, NanoSecs const& timeout);
+                  NanoSecs doCancelTimer(Runnable * const owner, Event * const timerId);
                   void doSetTrigger(const NanoSecs& timeout) const;
                   void doInit(int minWorkersPerCpu);
                   void run(Socket& sock, const uint32_t events) const;
@@ -65,30 +65,13 @@ namespace Sb {
                   void worker(Worker& me);
                   void doAdd(std::shared_ptr<Socket> const& what, const bool replace);
                   void doRemove(Socket* const what, const bool replace);
-                  void doAddTimer(std::shared_ptr<TimeEvent> const& what);
-                  void doRemoveTimer(TimeEvent* const what);
-                  std::shared_ptr<TimeEvent> getEvent(TimeEvent const* ev);
+                  void doAddTimer(std::shared_ptr<Runnable> const& what);
+                  void doRemoveTimer(Runnable * const what);
+                  std::shared_ptr<Runnable> getEvent(Runnable const* ev);
             private:
-                  class EpollEvent final {
-                        public:
-                              explicit EpollEvent(std::weak_ptr<TimeEvent> const what, uint32_t const events) : what(what), events(events) {
-                              }
-
-                                    std::weak_ptr<TimeEvent> epollEvent() const {
-                                    return what;
-                              };
-
-                              uint32_t epollEvents() const {
-                                    return events;
-                              };
-                        private:
-                              std::weak_ptr<TimeEvent> what;
-                              uint32_t const events;
-                  };
-
                   static Engine* theEngine;
                   Semaphore sem;
-                  SyncQueue<EpollEvent> eventQueue;
+                  SyncQueue<Event> eventQueue;
                   std::atomic_bool stopping;
                   std::atomic_int activeCount;
                   std::thread::id epollTid;
@@ -96,7 +79,7 @@ namespace Sb {
                   int epollFd = -1;
                   int timerFd = -1;
                   std::vector<Worker*> slaves;
-                  std::unordered_map<const TimeEvent*, const std::shared_ptr<TimeEvent>> eventHash;
+                  std::unordered_map<const Runnable *, const std::shared_ptr<Runnable>> eventHash;
                   std::mutex evHashLock;
                   Resolver theResolver;
                   Timers timers;

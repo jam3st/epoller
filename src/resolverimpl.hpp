@@ -8,7 +8,7 @@
 #include "resolver.hpp"
 #include "types.hpp"
 #include "clock.hpp"
-#include "timeevent.hpp"
+#include "event.hpp"
 #include "udpsocket.hpp"
 #include "query.hpp"
 
@@ -21,7 +21,7 @@ namespace Sb {
       };
 
       class ResolverImpl
-            : public TimeEvent,
+            : public Runnable,
               public QueryHandlerIf {
             public:
                   ResolverImpl();
@@ -49,7 +49,7 @@ namespace Sb {
                               Resolver::AddrPref prefs;
                               std::vector<std::shared_ptr<ResolverIf>> clients;
                               std::vector<std::weak_ptr<UdpResolver>> resolvers;
-                              std::unique_ptr<Timer> timeout;
+                              std::unique_ptr<Event> timeout;
                   };
 
                   std::unordered_map<std::uint16_t, ResolverQuery> resQueries;

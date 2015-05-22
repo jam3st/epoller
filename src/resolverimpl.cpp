@@ -126,7 +126,7 @@ namespace Sb {
                   }
             } else {
                   logDebug("adding request " + std::to_string(request));
-                  resQueries[request] = { prefs, { }, { }, std::make_unique<Timer>(std::bind(&ResolverImpl::queryTimedout, this, request)) };
+                  resQueries[request] = { prefs, { }, { }, std::make_unique<Event>(std::bind(&ResolverImpl::queryTimedout, this, request)) };
                   resQueries[request].prefs = prefs;
 
                   if(prefs != Resolver::AddrPref::Ipv4Only) {

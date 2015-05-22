@@ -242,7 +242,7 @@ class ResolveNameSy : public ResolverIf {
             }
 };
 
-class ExitTimer : public TimeEvent {
+class ExitTimer : public Runnable {
       public:
             ExitTimer() : timer0 { std::bind(&ExitTimer::timedout0, this) },
                           timer1 { std::bind(&ExitTimer::timedout1, this) },
@@ -280,11 +280,11 @@ class ExitTimer : public TimeEvent {
      void timedout4() {
      std::cerr << "timedout4" << std::endl;
 }
-     Timer timer0;
-     Timer timer1;
-     Timer timer2;
-     Timer timer3;
-     Timer timer4;
+     Event timer0;
+     Event timer1;
+     Event timer2;
+     Event timer3;
+     Event timer4;
 
 };
 
