@@ -65,6 +65,7 @@ class Remote : public TcpStreamIf {
             virtual void received(const Bytes& x) override {
                   logDebug("Remote received");
                   auto ref = ep.lock();
+                  std::lock_guard<std::mutex> sync(writeLock);
 
                   if(ref) {
                         ref->queueWrite(x);
@@ -85,6 +86,7 @@ class Remote : public TcpStreamIf {
             }
 
             void doWrite(const Bytes& x) {
+                  std::lock_guard<std::mutex> sync(writeLock);
                   auto ref = tcpStream.lock();
 
                   if(ref) {
@@ -100,13 +102,10 @@ class Remote : public TcpStreamIf {
                   }
             }
 
-            virtual void timeout(const size_t /*timerId*/) override {
-                  //                s.setTimer(5, NanoSecs(1000000000));
-                  logDebug("blah expired");
-            }
       private:
             std::weak_ptr<TcpStream> ep;
             Bytes initWrite;
+            std::mutex writeLock;
 };
 
 class HttpProxy : public TcpStreamIf {
@@ -223,10 +222,6 @@ class HttpProxy : public TcpStreamIf {
                   }
             }
 
-            virtual void timeout(const size_t /*timerId*/) override {
-                  //                s.setTimer(5, NanoSecs(1000000000));
-                  logDebug("blah expired");
-            }
       private:
             Bytes header;
             std::weak_ptr<Remote> ep;
@@ -244,48 +239,34 @@ class ResolveNameSy : public ResolverIf {
 
 class ExitTimer : public Runnable {
       public:
-            ExitTimer() : timer0 { std::bind(&ExitTimer::timedout0, this) },
-                          timer1 { std::bind(&ExitTimer::timedout1, this) },
-                          timer2 { std::bind(&ExitTimer::timedout2, this) },
-                          timer3 { std::bind(&ExitTimer::timedout3, this) },
-                          timer4 { std::bind(&ExitTimer::timedout4, this) } {
+            ExitTimer() {
             }
 
-            void setTimer() {
-                  Engine::cancelTimer(this, &timer0);
-                  Engine::setTimer(this, &timer0, NanoSecs { 10'000'000'000 });
-                                   Engine::setTimer(this, &timer4, NanoSecs{ 4'000'000'000
-                                                           });
-                  Engine::setTimer(this, &timer3, NanoSecs { 3'000'000'000 });
-                                   Engine::setTimer(this, &timer1, NanoSecs{ 1'000'000'000
-                                                           });
-                  Engine::setTimer(this, &timer2, NanoSecs { 2'000'000'000 });
-                                   Engine::cancelTimer(this, &timer1);
-
-                 }
+            void setTimers() {
+                  timer0 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 0));
+                  timer1 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 1));
+                  timer2 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 2));
+                  timer3 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 3));
+                  timer4 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 4));
+                  Engine::cancelTimer(timer0.get());
+                  Engine::setTimer(timer0.get(), NanoSecs { 10000000000 });
+                  Engine::setTimer(timer4.get(), NanoSecs { 4000000000 });
+                  Engine::setTimer(timer3.get(), NanoSecs { 3000000000 });
+                  Engine::setTimer(timer1.get(), NanoSecs { 1000000000 });
+                  Engine::setTimer(timer2.get(), NanoSecs { 2000000000 });
+                  Engine::cancelTimer(timer1.get());
+            }
 
      private:
-     void timedout0() {
-     std::cerr << "timedout0" << std::endl;
-}
-     void timedout1() {
-     std::cerr << "timedout1" << std::endl;
-}
-     void timedout2() {
-     std::cerr << "timedout2" << std::endl;
-}
-     void timedout3() {
-     std::cerr << "timedout3" << std::endl;
-}
-     void timedout4() {
-     std::cerr << "timedout4" << std::endl;
-}
-     Event timer0;
-     Event timer1;
-     Event timer2;
-     Event timer3;
-     Event timer4;
-
+            void timedout(int id) {
+                  logDebug("timedout timer " + std::to_string(id));
+            }
+      private:
+            std::unique_ptr<Event> timer0;
+            std::unique_ptr<Event> timer1;
+            std::unique_ptr<Event> timer2;
+            std::unique_ptr<Event> timer3;
+            std::unique_ptr<Event> timer4;
 };
 
 class NameServer : public UdpSocketIf {
@@ -313,12 +294,16 @@ class NameServer : public UdpSocketIf {
 };
 
 int main(const int, const char*const argv[]) {
-	  ::close(0);
-//	runUnit("timer", [ ]() {
-//		auto ref = std::make_shared<ExitTimer>();
-//		Engine::addTimer(ref);
-//		ref->setTimer();
+	::close(0);
+//      auto exitTimer = std::make_shared<ExitTimer>();
+//	runUnit("timer", [&exitTimer]() {
+//          exitTimer->setTimers();
 //	});
+//      exitTimer.reset();
+//      runUnit("resolve",[] () {
+//            Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "asdasdasd", Resolver::AddrPref::AnyAddr);
+//      });
+//
 //      runUnit("resolve",[] () {
 //            Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "ipv6.google.com", Resolver::AddrPref::AnyAddr);
 //      });

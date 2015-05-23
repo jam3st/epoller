@@ -9,16 +9,19 @@ namespace Sb {
       Timers::~Timers() {
       }
 
-      std::pair<Runnable * const, Event * const> Timers::onTimerExpired() {
+      Event* Timers::handleTimerExpired() {
             std::lock_guard<std::mutex> lock(timeLock);
-            auto ev = timesByDate.begin()->second.ep;
-            auto timerId = timesByDate.begin()->second.id;
-            removeTimer(ev, timerId);
-            setTrigger();
-            return std::make_pair(ev, timerId);
+            Event* event = nullptr;
+            if(timesByDate.size() > 0) {
+                  auto ev = timesByDate.begin()->second.ep;
+                  event = timesByDate.begin()->second.id;
+                  removeTimer(ev, event);
+                  setTrigger();
+            }
+            return event;
       }
 
-      TimePointNs Timers::removeTimer(Runnable * const what, Event * const timerId) {
+      TimePointNs Timers::removeTimer(Runnable* const what, Event* const timerId) {
             auto iiByOwner = timersByOwner.equal_range(what);
             TimePointNs prevTp = SteadyClock::now();
 
@@ -48,16 +51,13 @@ namespace Sb {
       }
 
       void Timers::setTrigger() {
-            auto trigger = NanoSecs { 0 };
-
             if(timesByDate.size() > 0) {
-                  trigger = std::max(NanoSecs { 1 }, NanoSecs { timesByDate.begin()->first - SteadyClock::now() });
+                  auto const trigger = std::max(NanoSecs { 1 }, NanoSecs { timesByDate.begin()->first - SteadyClock::now() });
+                  armTimer(trigger);
             }
-
-            armTimer(trigger);
       }
 
-      NanoSecs Timers::cancelTimer(Runnable * const what, Event * const timerId) {
+      NanoSecs Timers::cancelTimer(Runnable* const what, Event* const timerId) {
             std::lock_guard<std::mutex> sync(timeLock);
             auto oldStart = timesByDate.begin();
             auto timerCount = removeTimer(what, timerId) - SteadyClock::now();

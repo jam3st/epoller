@@ -29,7 +29,6 @@ namespace Sb {
                   void resolve
                   (std::shared_ptr<ResolverIf> client, const std::string& name, const Resolver::AddrPref& prefs, const NanoSecs& timeout, const InetDest& nameServer);
                   void cancel(const ResolverIf* client);
-                  void destroy();
                   void requestComplete(uint16_t const reqNo, Query::Qanswer const& ans) override;
                   void requestError(uint16_t const reqNo) override;
                   void queryTimedout(std::uint16_t);

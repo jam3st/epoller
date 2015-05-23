@@ -18,10 +18,12 @@ namespace Sb {
       class Event final {
             public:
                   Event() = delete;
-                  explicit Event(std::function<void()> const& func);
-                  void operator()();
+                  explicit Event(std::shared_ptr<Runnable> const& owner, std::function<void()> const& func);
+                  void operator()() const;
+                  Runnable* owner() const;
             private:
                   std::function<void()> const func;
-                  std::weak_ptr<Runnable> owner;
+                  std::weak_ptr<Runnable> const obj;
+                  Runnable* const origOwner;
       };
 }

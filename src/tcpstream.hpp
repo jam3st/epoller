@@ -16,7 +16,6 @@ namespace Sb {
                   virtual void received(const Bytes&) = 0;
                   virtual void writeComplete() = 0;
                   virtual void disconnected() = 0;
-                  virtual void timeout(const size_t timerId) = 0;
             protected:
                   std::weak_ptr<TcpStream> tcpStream;
       };

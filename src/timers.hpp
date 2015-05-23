@@ -8,9 +8,10 @@
 namespace Sb {
       class Timers {
             public:
-                  Timers(const std::function<void(NanoSecs const& when)> armTimer);
+                  Timers() = delete;
+                  explicit Timers(const std::function<void(NanoSecs const& when)> armTimer);
                   ~Timers();
-                  std::pair<Runnable * const, Event * const> onTimerExpired();
+                  Event* handleTimerExpired();
                   void cancelAllTimers(Runnable * const what);
                   NanoSecs setTimer(Runnable * const what, Event * const timerId, NanoSecs const& timeout);
                   NanoSecs cancelTimer(Runnable * const what, Event * const timerId);

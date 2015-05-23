@@ -10,13 +10,13 @@ namespace Sb {
       }
 
       TcpStream::TcpStream(const int fd, std::shared_ptr<TcpStreamIf>& client) :
-            Socket(fd),
-            client(client),
-            waitingWriteEvent(false),
-            writeQueue({}),
-            disconnected(false),
-            readError(false),
-            writeError(false) {
+                              Socket(fd),
+                              client(client),
+                              waitingWriteEvent(false),
+                              writeQueue({}),
+                              disconnected(false),
+                              readError(false),
+                              writeError(false) {
             Socket::makeNonBlocking(fd);
       }
 
@@ -38,7 +38,6 @@ namespace Sb {
             for(;;) {
                   Bytes data(MAX_PACKET_SIZE);
                   auto const actuallyRead = read(data);
-                  logDebug("HR " + std::to_string(actuallyRead));
                   if(actuallyRead > 0) {
                         if(ref) {
                               ref->received(data);
@@ -78,7 +77,7 @@ namespace Sb {
                         } else {
                               auto const data = std::get<0>(q);
                               auto const actuallySent = write(data);
-                              if(actuallySent == data.size()) {
+                              if(actuallySent - data.size() == 0) {
                                     continue;
                               } else if(actuallySent >= 0) {
                                     writeQueue.addFirst(Bytes(data.begin() + actuallySent, data.end()));

@@ -126,7 +126,7 @@ namespace Sb {
                   }
             } else {
                   logDebug("adding request " + std::to_string(request));
-                  resQueries[request] = { prefs, { }, { }, std::make_unique<Event>(std::bind(&ResolverImpl::queryTimedout, this, request)) };
+                  resQueries[request] = { prefs, { }, { }, std::make_unique<Event>(shared_from_this(), std::bind(&ResolverImpl::queryTimedout, this, request)) };
                   resQueries[request].prefs = prefs;
 
                   if(prefs != Resolver::AddrPref::Ipv4Only) {
@@ -142,7 +142,7 @@ namespace Sb {
                         resQueries[request].clients.push_back(client);
                   }
 
-                  Engine::setTimer(this, resQueries[request].timeout.get(), timeout);
+                  Engine::setTimer(resQueries[request].timeout.get(), timeout);
                   request++;
             }
       }
@@ -151,10 +151,6 @@ namespace Sb {
       ResolverImpl::cancel(const ResolverIf* /*client*/) {
             std::lock_guard<std::mutex> sync(lock);
             //          auto it = byName.find(&name);
-      }
-
-      void
-      ResolverImpl::destroy() {
       }
 
       void ResolverImpl::queryTimedout(std::uint16_t queryId) {
@@ -239,7 +235,7 @@ namespace Sb {
                               }
                         }
 
-                        Engine::cancelTimer(this, it->second.timeout.get());
+                        Engine::cancelTimer(it->second.timeout.get());
                         resQueries.erase(it);
                   }
             }

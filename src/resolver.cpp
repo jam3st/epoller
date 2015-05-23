@@ -9,43 +9,29 @@ namespace Sb {
       Resolver::~Resolver() {
       }
 
-      void
-      Resolver::init() {
-            auto ref = impl.lock();
-
-            if(!ref) {
-                  auto sp = std::make_shared<ResolverImpl>();
-                  Engine::addTimer(sp);
-                  impl = sp;
+      void Resolver::init() {
+            if(!impl) {
+                  impl  = std::make_shared<ResolverImpl>();
             } else {
                   throw std::runtime_error("Already initialised - from a single threaded context");
             }
       }
 
-      void
-      Resolver::resolve(std::shared_ptr<ResolverIf> client, const std::string& name, const AddrPref& prefs, const NanoSecs& timeout, const InetDest& nameServer) {
-            auto ref = impl.lock();
-
-            if(ref) {
-                  ref->resolve(client, name, prefs, timeout, nameServer);
+      void Resolver::resolve(std::shared_ptr<ResolverIf> client, const std::string& name, const AddrPref& prefs, const NanoSecs& timeout, const InetDest& nameServer) {
+            if(impl) {
+                  impl->resolve(client, name, prefs, timeout, nameServer);
             }
       }
 
-      void
-      Resolver::cancel(const ResolverIf* client) {
-            auto ref = impl.lock();
-
-            if(ref) {
-                  ref->cancel(client);
+      void Resolver::cancel(const ResolverIf* client) {
+            if(impl) {
+                  impl->cancel(client);
             }
       }
 
-      void
-      Resolver::destroy() {
-            auto ref = impl.lock();
-
-            if(ref) {
-                  Engine::removeTimer(ref.get());
+      void Resolver::destroy() {
+            if(impl) {
+                  impl.reset();
             }
       }
 }

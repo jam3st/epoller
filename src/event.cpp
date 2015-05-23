@@ -8,11 +8,14 @@ namespace Sb {
       Runnable::~Runnable() {
       }
 
-      Event::Event(std::function<void()> const& func) : func(func) {
+      Event::Event(std::shared_ptr<Runnable> const& owner, std::function<void()> const& func) : func(func), obj(owner), origOwner(owner.get()) {
       }
 
-      void Event::operator()() {
-            auto const ref = owner.lock();
+      Runnable* Event::owner() const {
+            return origOwner;
+      }
+      void Event::operator()() const {
+            auto const ref = obj.lock();
             if(ref) {
                   func();
             }
