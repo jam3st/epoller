@@ -28,13 +28,31 @@ namespace Sb {
                         queue.push_front(src);
                   }
 
-                  std::tuple<T, bool> removeAndIsEmpty() {
+                  void removeAll(T* src) {
+                        std::lock_guard<std::mutex> sync(lock);
+                        auto it = queue.begin();
+                        while(it != queue.end()) {
+                              if(*it == *src) {
+                                    queue.erase(it);
+                                    it = queue.begin();
+                              } else {
+                                    ++it;
+                              }
+                        }
+                  }
+
+                  std::pair<T, bool> removeAndIsEmpty() {
                         std::lock_guard<std::mutex> sync(lock);
 
                         if(queue.empty()) {
-                              return std::make_tuple(sentinel, true);
+                              if(!shrunk) {
+                                    shrunk = true;
+                                    queue.shrink_to_fit();
+                              }
+                              return std::make_pair(sentinel, true);
                         } else {
-                              auto ret = std::make_tuple(queue.front(), false);
+                              shrunk = false;
+                              auto ret = std::make_pair(queue.front(), false);
                               queue.pop_front();
                               return ret;
                         }
@@ -51,6 +69,7 @@ namespace Sb {
                   size_t start = 0;
                   static const size_t size;
                   const T sentinel;
+                  bool shrunk = true;
       };
 
       template<typename T> const size_t SyncQueue<T>::size = sizeof(T);

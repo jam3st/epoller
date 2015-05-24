@@ -143,8 +143,6 @@ namespace Sb {
             sem.signal();
       }
 
-
-
       NanoSecs Engine::setTimer(Event* const timer, NanoSecs const& timeout) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Engine::setTimer Please call Engine::Init() first");
@@ -213,7 +211,7 @@ namespace Sb {
             pErrorThrow(::timerfd_settime(timerFd, 0, &new_timer, &old_timer), timerFd);
       }
 
-      void Engine::doAdd(const std::shared_ptr<Socket>& what, const bool replace) {
+      void Engine::doAdd(const std::shared_ptr<Socket>& what) {
             std::lock_guard<std::mutex> sync(evHashLock);
 
             if(!stopping) {
@@ -221,45 +219,37 @@ namespace Sb {
                   epoll_event event = { 0, { 0 }};
                   event.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLRDHUP | EPOLLHUP;
                   event.data.ptr = what.get();
-
-                  if(replace) {
-                        epoll_event nullEvent = { 0, { 0 }};
-                        pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_DEL, what->getFd(), &nullEvent), epollFd);
-                  }
-
                   pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_ADD, what->getFd(), &event), epollFd);
             } else {
                   throw std::runtime_error("Cannot add when engine is stopping.");
             }
       }
 
-      void Engine::add(const std::shared_ptr<Socket>& what, const bool replace) {
+      void Engine::add(const std::shared_ptr<Socket>& what) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Please call Engine::Init() first");
             }
-            theEngine->doAdd(what, replace);
+            theEngine->doAdd(what);
       }
 
-      void Engine::doRemove(Socket* const what, const bool replace) {
+      void Engine::doRemove(Socket* const what) {
             std::lock_guard<std::mutex> sync(evHashLock);
-            epoll_event event = { 0, { 0 }};
             auto it = eventHash.find(what);
             assert(it != eventHash.end(), "Not found for removal");
-
-            if(!replace) {
-                  pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_DEL, what->getFd(), &event), epollFd);
-            }
-
+            epoll_event event = { 0, { 0 }};
+            pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_DEL, what->getFd(), &event), epollFd);
             timers.cancelAllTimers(what);
+            auto dummy = Event(it->second, []() {});
+            eventQueue.removeAll(&dummy);
             eventHash.erase(it);
       }
 
-      void Engine::remove(Socket* const what, bool const replace) {
+      void Engine::remove(Socket* const what) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Please call Engine::Init() first");
             }
 
-            theEngine->doRemove(what, replace);
+            theEngine->doRemove(what);
       }
 
       void Engine::init() {
@@ -313,19 +303,23 @@ namespace Sb {
 
                   for(;;) {
                         sem.wait();
+                        evHashLock.lock();
                         auto const q = eventQueue.removeAndIsEmpty();
-                        auto const empty = std::get<1>(q);
+                        auto const empty = q.second;
+                        auto const event = q.first;
+                        evHashLock.unlock();
 
                         if(!empty) {
-                              auto const event = std::get<0>(q);
                               activeCount++;
                               event();
                               activeCount--;
                         }
-                        std::lock_guard<std::mutex> sync(evHashLock);
-                        if(eventHash.size() == NUM_ENGINE_EVENTS && !timerPending && activeCount == 0) {
-                              doStop();
-                              break;
+                        {
+                              std::lock_guard<std::mutex> sync(evHashLock);
+                              if(eventHash.size() == NUM_ENGINE_EVENTS && !timerPending && activeCount == 0) {
+                                    doStop();
+                                    break;
+                              }
                         }
                   }
             } catch(std::exception& e) {

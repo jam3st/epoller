@@ -18,8 +18,8 @@ namespace Sb {
                   static void start(int minWorkersPerCpu = 4);
                   static void stop();
                   static void init();
-                  static void add(const std::shared_ptr<Socket>& what, const bool replace = false);
-                  static void remove(Socket* const what, bool const replace = false);
+                  static void add(const std::shared_ptr<Socket>& what);
+                  static void remove(Socket* const what);
                   static void runAsync(Event* const event);
                   static Resolver& resolver();
                   static NanoSecs setTimer(Event* const timer, NanoSecs const& timeout);
@@ -61,8 +61,8 @@ namespace Sb {
                   void run(Socket* const sock, const uint32_t events) const;
                   void doEpoll();
                   void worker(Worker& me);
-                  void doAdd(std::shared_ptr<Socket> const& what, const bool replace);
-                  void doRemove(Socket* const what, const bool replace);
+                  void doAdd(std::shared_ptr<Socket> const& what);
+                  void doRemove(Socket* const what);
                   void doRunAsync(Event* const event);
 
             private:

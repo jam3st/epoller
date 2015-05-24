@@ -86,7 +86,7 @@ class Remote : public TcpStreamIf {
 			}
 		}
 
-		virtual void timeout(const size_t /*timerId*/) override {
+		virtual void timeout(const size_t /*timer*/) override {
 //			s.setTimer(5, NanoSecs(1000000000));
 			logDebug("blah expired");
 		}
@@ -190,7 +190,7 @@ std::cout << " ************************** host " << host  << " " << port << "***
 			logDebug("HttpProxy onDisconnect");
 		}
 
-		virtual void timeout(const size_t /*timerId*/) override {
+		virtual void timeout(const size_t /*timer*/) override {
 //			s.setTimer(5, NanoSecs(1000000000));
 			logDebug("blah expired");
 		}

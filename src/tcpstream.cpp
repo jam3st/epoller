@@ -3,11 +3,11 @@
 
 namespace Sb {
       void TcpStream::create(const int fd,
-                             std::shared_ptr<TcpStreamIf>& client, const bool replace) {
+                             std::shared_ptr<TcpStreamIf>& client) {
             auto ref = std::make_shared<TcpStream>(fd, client);
             client->tcpStream = ref;
             ref->notifyWriteComplete = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncWriteComplete, ref.get()));
-            Engine::add(ref, replace);
+            Engine::add(ref);
       }
 
       TcpStream::TcpStream(const int fd, std::shared_ptr<TcpStreamIf>& client) :
@@ -68,11 +68,11 @@ namespace Sb {
             bool wasEmpty = writeQueue.len() == 0;
             for(;;) {
                   auto const q = writeQueue.removeAndIsEmpty();
-                  auto const empty = std::get<1>(q);
+                  auto const empty = q.second;
                   if(empty) {
                         break;
                   } else {
-                        auto const data = std::get<0>(q);
+                        auto const data = q.first;
                         auto const actuallySent = write(data);
                         if((actuallySent - data.size()) == 0) {
                               continue;

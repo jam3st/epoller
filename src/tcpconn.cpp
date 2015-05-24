@@ -46,9 +46,10 @@ namespace Sb {
             logDebug("TcpConn::createStream() " + std::to_string(fd));
             std::lock_guard<std::mutex> sync(lock);
             if(client) {
+                  // event still has a reference
+                  Engine::remove(this);
                   auto const thisFd = releaseFd();
-                  Engine::remove(this, true);
-                  TcpStream::create(thisFd, client, true);
+                  TcpStream::create(thisFd, client);
                   added = false;
                   client = nullptr;
             }
