@@ -5,10 +5,7 @@ namespace Sb {
             void create(const struct InetDest& dest, std::shared_ptr<TcpStreamIf> client) {
                   auto ref = std::make_shared<TcpConn>(client, dest.port);
                   logDebug("TcpConn::create() " + dest.toString() + " " + std::to_string(ref->getFd()));
-                  Engine::add(ref);
-                  ref->self = nullptr;
-                  ref->added = true;
-                  ref->connect(dest);
+                  ref->doConnect(ref, dest);
             }
 
             void create(const std::string& dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client) {
@@ -46,11 +43,12 @@ namespace Sb {
       }
 
       void TcpConn::createStream() {
-            logDebug("TcpConn::createStream() " + intToHexString(client));
+            logDebug("TcpConn::createStream() " + std::to_string(fd));
             std::lock_guard<std::mutex> sync(lock);
             if(client) {
-                  TcpStream::create(releaseFd(), client, true);
+                  auto const thisFd = releaseFd();
                   Engine::remove(this, true);
+                  TcpStream::create(thisFd, client, true);
                   added = false;
                   client = nullptr;
             }
@@ -60,6 +58,15 @@ namespace Sb {
       TcpConn::handleWrite() {
             logDebug("TcpConn::handleWrite " + std::to_string(fd));
             createStream();
+      }
+
+      void TcpConn::doConnect(std::shared_ptr<TcpConn>& ref, InetDest const& dest) {
+            logDebug("TcpConn::doConnect " + dest.toString() + " " + std::to_string(fd));
+            std::lock_guard<std::mutex> sync(lock);
+            added = true;
+            connect(dest);
+            Engine::add(ref);
+            self = nullptr; // After add because self == ref when called from resolver
       }
 
       void
@@ -81,11 +88,7 @@ namespace Sb {
       TcpConn::resolved(IpAddr const& addr) {
             InetDest dest { addr, true, port };
             logDebug("resolved added " + dest.toString());
-            std::lock_guard<std::mutex> sync(lock);
-            Engine::add(self);
-            self = nullptr;
-            added = true;
-            connect(dest);
+            doConnect(self, dest);
       }
 
       void TcpConn::error() {

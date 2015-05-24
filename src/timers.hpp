@@ -13,11 +13,11 @@ namespace Sb {
                   ~Timers();
                   Event* handleTimerExpired();
                   void cancelAllTimers(Runnable * const what);
-                  NanoSecs setTimer(Runnable * const what, Event * const timerId, NanoSecs const& timeout);
-                  NanoSecs cancelTimer(Runnable * const what, Event * const timerId);
+                  NanoSecs setTimer(Runnable * const what, Event * const timer, NanoSecs const& timeout);
+                  NanoSecs cancelTimer(Runnable * const what, Event * const timer);
             private:
                   void setTrigger();
-                  TimePointNs removeTimer(Runnable * const what, Event * const timerId);
+                  TimePointNs removeTimer(Runnable * const what, Event * const timer);
             private:
                   struct TimerDateId final {
                         TimePointNs tp;

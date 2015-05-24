@@ -15,5 +15,6 @@ namespace Sb {
             private:
                   void createStream(const int newFd);
                   std::function<std::shared_ptr<TcpStreamIf>()> clientFactory;
+                  std::mutex lock;
       };
 }

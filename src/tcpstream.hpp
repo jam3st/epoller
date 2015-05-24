@@ -11,7 +11,7 @@ namespace Sb {
       class TcpStreamIf : public std::enable_shared_from_this<TcpStreamIf> {
             public:
                   friend class TcpStream;
-
+                  virtual void connected() = 0;
                   virtual void disconnect() = 0;
                   virtual void received(const Bytes&) = 0;
                   virtual void writeComplete() = 0;
@@ -35,18 +35,19 @@ namespace Sb {
                   virtual void handleError() override;
 
             private:
-                  virtual bool writeHandler(bool const fromTrigger = false);
+                  virtual bool handleConnect();
+                  virtual void asyncWriteComplete();
+                  virtual void writeHandler();
 
             private:
                   std::shared_ptr<TcpStreamIf> client;
                   std::mutex writeLock;
                   std::mutex readLock;
                   std::mutex errorLock;
-                  bool waitingWriteEvent;
                   SyncQueue<Bytes> writeQueue;
                   bool disconnected;
-                  bool readError;
-                  bool writeError;
+                  bool notifiedConnect;
+                  std::unique_ptr<Event> notifyWriteComplete;
       };
 }
 

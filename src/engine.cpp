@@ -130,28 +130,43 @@ namespace Sb {
             stopWorkers();
       }
 
-      void Engine::setTimer(Event* const timerId, NanoSecs const& timeout) {
+      void Engine::runAsync(Event* const event) {
+            if(Engine::theEngine == nullptr) {
+                  throw std::runtime_error("Engine::runAsync Please call Engine::Init() first");
+            }
+
+            Engine::theEngine->doRunAsync(event);
+      }
+
+      void Engine::doRunAsync(Event* const event) {
+            eventQueue.addLast(*event);
+            sem.signal();
+      }
+
+
+
+      NanoSecs Engine::setTimer(Event* const timer, NanoSecs const& timeout) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Engine::setTimer Please call Engine::Init() first");
             }
 
-            Engine::theEngine->doSetTimer(timerId, timeout);
+            return Engine::theEngine->doSetTimer(timer, timeout);
       }
 
-      NanoSecs Engine::doSetTimer(Event* const timerId, NanoSecs const& timeout) {
-            return timers.setTimer(timerId->owner(), timerId, timeout);
+      NanoSecs Engine::doSetTimer(Event* const timer, NanoSecs const& timeout) {
+            return timers.setTimer(timer->owner(), timer, timeout);
       }
 
-      NanoSecs Engine::cancelTimer(Event* const timerId) {
+      NanoSecs Engine::cancelTimer(Event* const timer) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Engine::cancelTimer Please call Engine::Init() first");
             }
 
-            return Engine::theEngine->doCancelTimer(timerId);
+            return Engine::theEngine->doCancelTimer(timer);
       }
 
-      NanoSecs Engine::doCancelTimer(Event * const timerId) {
-            auto ret = timers.cancelTimer(timerId->owner(), timerId);
+      NanoSecs Engine::doCancelTimer(Event * const timer) {
+            auto ret = timers.cancelTimer(timer->owner(), timer);
             return ret;
       }
 
@@ -202,10 +217,9 @@ namespace Sb {
             std::lock_guard<std::mutex> sync(evHashLock);
 
             if(!stopping) {
-                  logDebug("Engine::add " + std::to_string(what->getFd()));
                   eventHash.insert(std::make_pair(what.get(), what));
                   epoll_event event = { 0, { 0 }};
-                  event.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR;
+                  event.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLRDHUP | EPOLLHUP;
                   event.data.ptr = what.get();
 
                   if(replace) {
@@ -218,11 +232,11 @@ namespace Sb {
                   throw std::runtime_error("Cannot add when engine is stopping.");
             }
       }
+
       void Engine::add(const std::shared_ptr<Socket>& what, const bool replace) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Please call Engine::Init() first");
             }
-
             theEngine->doAdd(what, replace);
       }
 
@@ -272,8 +286,10 @@ namespace Sb {
       }
 
       void Engine::run(Socket* const sock, const uint32_t events) const {
-            logDebug("Engine::Run " + pollEventsToString(events) + " " + std::to_string(sock->getFd()));
-
+            logDebug("Engine::Run " + pollEventsToString(events) + " " + std::to_string(sock->fd));
+            if(sock->fd < 0) {
+                  return;
+            }
             if((events & EPOLLOUT) != 0) {
                   sock->handleWrite();
             }

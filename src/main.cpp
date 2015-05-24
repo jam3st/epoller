@@ -44,6 +44,124 @@ std::pair<const Bytes::iterator, const Bytes::iterator> findFirstPattern(const B
       return std::make_pair(end, end);
 }
 
+class TcpSplat : public TcpStreamIf {
+      public:
+            TcpSplat() : count(0) {
+                  logDebug("TcpSplat");
+            }
+            virtual ~TcpSplat() {
+                  logDebug("~TcpSplat destroyed");
+            }
+
+            virtual void disconnect() override {
+                  logDebug("TcpSplat disconnect");
+            }
+
+            virtual void received(const Bytes& x) override {
+                  logDebug("TcpSplat received " + std::to_string(x.size()));
+            }
+
+            virtual void connected() override {
+                  logDebug("TcpSplat connected");
+                  auto ref = tcpStream.lock();
+                  ref->queueWrite({'S', 'p', 'l', 'a', 't', '\r', '\n'});
+
+            }
+
+            virtual void disconnected() override {
+                  logDebug("TcpSplat onDisconnect");
+            }
+
+            virtual void writeComplete() override {
+                  logDebug("TcpSplat writeComplete");
+                  std::stringstream stream;
+                  stream << std::endl << std::setfill('0') << std::setw(8) << std::dec << count++;
+                  auto str = stream.str();
+                  Bytes x(str.begin(), str.end());
+                  x.push_back('\r');
+                  auto ref = tcpStream.lock();
+                  if(ref) {
+                        logError("SPLAT");
+                        ref->queueWrite(x);
+                  }
+            }
+      private:
+            size_t count;
+      };
+
+class TcpSink : public TcpStreamIf {
+      public:
+            TcpSink() {
+                  logDebug("TcpSink");
+            }
+            virtual ~TcpSink() {
+                  logDebug("~TcpSink destroyed");
+            }
+
+            virtual void disconnect() override {
+                  logDebug("TcpSink disconnect");
+            }
+
+            virtual void received(const Bytes& x) override {
+                  logDebug("TcpSink received " + std::to_string(x.size()));
+            }
+
+            virtual void connected() override {
+                  logDebug("TcpSink connected");
+            }
+
+            virtual void disconnected() override {
+                  logDebug("TcpSink onDisconnect");
+            }
+
+            virtual void writeComplete() override {
+                  logDebug("TcpSink writeComplete");
+            }
+};
+
+class TcpEcho : public TcpStreamIf {
+      public:
+            TcpEcho() : initWrite({'H', 'e', 'l', 'l', 'o', '\r', '\n'}) {
+                  logDebug("TcpEcho created initial " + std::to_string(initWrite.size()));
+            }
+            virtual ~TcpEcho() {
+                  logDebug("~TcpEcho destroyed");
+            }
+
+            virtual void disconnect() override {
+                  logDebug("TcpEcho disconnect");
+            }
+
+            virtual void received(const Bytes& x) override {
+                  logDebug("TcpEcho received");
+                  auto ref = tcpStream.lock();
+                  if(ref) {
+                        ref->queueWrite(x);
+                  }
+            }
+
+            virtual void connected() override {
+                  logDebug("TcpEcho connected " + std::to_string(initWrite.size()));
+                  std::lock_guard<std::mutex> sync(lock);
+                  auto ref = tcpStream.lock();
+                  if(initWrite.size() > 0) {
+                        ref->queueWrite(initWrite);
+                        initWrite.resize(0);
+                  }
+            }
+
+            virtual void disconnected() override {
+                  logDebug("TcpEcho onDisconnect");
+            }
+
+            virtual void writeComplete() override {
+                  logDebug("TcpEcho writeComplete");
+            }
+      private:
+            Bytes initWrite;
+            std::mutex lock;
+};
+
 class Remote : public TcpStreamIf {
       public:
             Remote(const std::weak_ptr<TcpStream> ep, Bytes& initWrite) : ep(ep), initWrite(initWrite) {
@@ -65,16 +183,19 @@ class Remote : public TcpStreamIf {
             virtual void received(const Bytes& x) override {
                   logDebug("Remote received");
                   auto ref = ep.lock();
-                  std::lock_guard<std::mutex> sync(writeLock);
-
                   if(ref) {
                         ref->queueWrite(x);
                   }
             }
 
-
-            virtual void writeComplete() override {
-                  logDebug("Remote onReadyToWrite");
+            virtual void connected() override {
+                  logDebug("Remote connected " + std::to_string(initWrite.size()));
+                  std::lock_guard<std::mutex> sync(lock);
+                  auto ref = tcpStream.lock();
+                  if(initWrite.size() > 0) {
+                        ref->queueWrite(initWrite);
+                        initWrite.resize(0);
+                  }
             }
 
             virtual void disconnected() override {
@@ -85,11 +206,14 @@ class Remote : public TcpStreamIf {
                   }
             }
 
+            virtual void writeComplete() override {
+                  logDebug("Remote writeComplete");
+            }
             void doWrite(const Bytes& x) {
-                  std::lock_guard<std::mutex> sync(writeLock);
                   auto ref = tcpStream.lock();
 
                   if(ref) {
+                        std::lock_guard<std::mutex> sync(lock);
                         if(initWrite.size() > 0) {
                               ref->queueWrite(initWrite);
                               initWrite.resize(0);
@@ -105,7 +229,7 @@ class Remote : public TcpStreamIf {
       private:
             std::weak_ptr<TcpStream> ep;
             Bytes initWrite;
-            std::mutex writeLock;
+            std::mutex lock;
 };
 
 class HttpProxy : public TcpStreamIf {
@@ -116,6 +240,10 @@ class HttpProxy : public TcpStreamIf {
 
             virtual ~HttpProxy() {
                   logDebug("~HttpProxy destroyed");
+            }
+
+            virtual void connected() override {
+                  logDebug("HttpProxy connected");
             }
 
             virtual void disconnect() override {
@@ -148,6 +276,7 @@ class HttpProxy : public TcpStreamIf {
 
                   if(doubleCr.first == doubleCr.second) {
                         logDebug("HttpProxy onReadCompleted without double CR");
+                        disconnect();
                         return;
                   }
 
@@ -200,7 +329,6 @@ class HttpProxy : public TcpStreamIf {
 
                   if(port == 443) {
                         auto ref = tcpStream.lock();
-
                         if(ref) {
                               ref->queueWrite({ 'H', 'T', 'T', 'P', '/', '1', '.', '1', ' ', '2', '0', '0', ' ', 'O', 'K', '\r', '\n', '\r', '\n' });
                         } else {
@@ -210,7 +338,7 @@ class HttpProxy : public TcpStreamIf {
             }
 
             virtual void writeComplete() override {
-                  logDebug("HttpProxy onReadyToWrite");
+                  logDebug("HttpProxy writeComplete");
             }
 
             virtual void disconnected() override {
@@ -315,5 +443,21 @@ int main(const int, const char*const argv[]) {
 //      runUnit("nameserver",[] () {
 //            UdpSocket::create(1024, std::make_shared<NameServer>());
 //      });
+//      runUnit("echotcp",[] () {
+//            TcpListener::create(1024, [ ]() {
+//                   return std::make_shared<TcpEcho>();
+//            });
+//      });
+//      runUnit("sinktcp",[] () {
+//            TcpListener::create(1024, [ ]() {
+//                  return std::make_shared<TcpSink>();
+//            });
+//      });
+//      runUnit("splattcp",[] () {
+//            TcpListener::create(1024, [ ]() {
+//                  return std::make_shared<TcpSplat>();
+//            });
+//      });
+
       return 0;
 }

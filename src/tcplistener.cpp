@@ -23,30 +23,26 @@ namespace Sb {
             logDebug("TcpListener::~TcpListener()");
       }
 
-      void
-      TcpListener::handleRead() {
+      void TcpListener::handleRead() {
             logDebug("TcpListener::handleRead");
+            std::lock_guard<std::mutex> sync(lock);
             for(;;) {
                   int const connFd = accept();
                   if(connFd >= 0) {
                         createStream(connFd);
                   } else if(connFd == -1) {
                         break;
-                  } else {
-                        continue;
                   }
             }
 
       }
 
-      void
-      TcpListener::handleWrite() {
-            logDebug("Epollable::handleWrite()");
+      void TcpListener::handleWrite() {
+            throw std::runtime_error("Epollable::handleWrite() not allowed " + std::to_string(fd));
       }
 
-      void
-      TcpListener::handleError() {
-            logDebug("Epollable::handleWrite()");
+      void TcpListener::handleError() {
+            throw std::runtime_error("Epollable::handleError() " + std::to_string(fd));
       }
 
       void TcpListener::createStream(const int connFd) {

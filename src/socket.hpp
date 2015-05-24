@@ -43,6 +43,6 @@ namespace Sb {
             private:
                   ssize_t convertError(ssize_t const error) const;
             private:
-                  const int LISTEN_MAX_PENDING = 1;
+                  const int LISTEN_MAX_PENDING = 64;
       };
 }

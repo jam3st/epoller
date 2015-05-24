@@ -29,12 +29,12 @@ namespace Sb {
                   void createStream();
 
             private:
-                  void doConnect(const InetDest &dest) const;
+                  void doConnect(std::shared_ptr<TcpConn>& ref, InetDest const& dest);
 
             private:
                   std::shared_ptr<TcpStreamIf> client;
                   uint16_t port;
-                  std::shared_ptr<Socket> self;
+                  std::shared_ptr<TcpConn> self;
                   bool added;
                   std::mutex lock;
       };

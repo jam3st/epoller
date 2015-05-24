@@ -17,7 +17,7 @@
 //                void handleRead();
 //                void handleWrite();
 //                void handleError();
-//                void handleTimeout(int timerId);
+//                void handleTimeout(int timer);
 //          private:
 //                std::queue<Bytes> writeQueue;
 //                std::mutex writeQueueLock;

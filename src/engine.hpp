@@ -20,9 +20,10 @@ namespace Sb {
                   static void init();
                   static void add(const std::shared_ptr<Socket>& what, const bool replace = false);
                   static void remove(Socket* const what, bool const replace = false);
+                  static void runAsync(Event* const event);
                   static Resolver& resolver();
-                  static void setTimer(Event* const timerId, NanoSecs const& timeout);
-                  static NanoSecs cancelTimer(Event* const timerId);
+                  static NanoSecs setTimer(Event* const timer, NanoSecs const& timeout);
+                  static NanoSecs cancelTimer(Event* const timer);
                   ~Engine();
                   void sync();
                   void startWorkers(int minWorkersPerCpu);
@@ -52,8 +53,8 @@ namespace Sb {
                   void doStop();
                   void doSignalHandler();
                   void handleTimerExpired();
-                  NanoSecs doSetTimer(Event* const timerId, NanoSecs const& timeout);
-                  NanoSecs doCancelTimer(Event* const timerId);
+                  NanoSecs doSetTimer(Event* const timer, NanoSecs const& timeout);
+                  NanoSecs doCancelTimer(Event* const timer);
                   void doSetTrigger(const NanoSecs& timeout);
                   void doInit(int minWorkersPerCpu);
                   std::shared_ptr<Runnable> getSocket(Socket const* const ev);
@@ -62,6 +63,7 @@ namespace Sb {
                   void worker(Worker& me);
                   void doAdd(std::shared_ptr<Socket> const& what, const bool replace);
                   void doRemove(Socket* const what, const bool replace);
+                  void doRunAsync(Event* const event);
 
             private:
                   static Engine* theEngine;

@@ -6,100 +6,94 @@ namespace Sb {
                              std::shared_ptr<TcpStreamIf>& client, const bool replace) {
             auto ref = std::make_shared<TcpStream>(fd, client);
             client->tcpStream = ref;
+            ref->notifyWriteComplete = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncWriteComplete, ref.get()));
             Engine::add(ref, replace);
       }
 
       TcpStream::TcpStream(const int fd, std::shared_ptr<TcpStreamIf>& client) :
                               Socket(fd),
                               client(client),
-                              waitingWriteEvent(false),
                               writeQueue({}),
                               disconnected(false),
-                              readError(false),
-                              writeError(false) {
+                              notifiedConnect(false) {
             Socket::makeNonBlocking(fd);
       }
 
       TcpStream::~TcpStream() {
             logDebug("TcpStream::~TcpStream() " + std::to_string(getFd()));
-            if(client != nullptr) {
-                  client->disconnected();
-            }
+            client->disconnected();
       }
 
       void TcpStream::handleRead() {
+            logDebug("TcpStream::handleRead() " + std::to_string(fd));
             std::lock_guard<std::mutex> sync(readLock);
-            logDebug("TcpStream::handleRead()");
-
-            if(readError) {
-                  return;
-            }
-            auto ref = client;
             for(;;) {
                   Bytes data(MAX_PACKET_SIZE);
                   auto const actuallyRead = read(data);
+                  logDebug("TcpStream::handleRead() read " + std::to_string(actuallyRead) + " "  + std::to_string(fd));
                   if(actuallyRead > 0) {
-                        if(ref) {
-                              ref->received(data);
-                        }
+                        client->received(data);
                   } else if(actuallyRead == 0 || actuallyRead == -1) {
                         break;
                   } else {
-                        readError = true;
                         break;
                   }
             }
-            if(readError) {
-                  disconnect();
-            }
       }
 
+      bool TcpStream::handleConnect() {
+            {
+                  std::lock_guard<std::mutex> sync(writeLock);
+                  if(notifiedConnect) {
+                        return false;
+                  } else {
+                        logDebug("TcpStream::handleConnect() " + std::to_string(fd));
+                        notifiedConnect = true;
+                  }
+            }
+            client->connected();
+            return true;
+
+      }
       void TcpStream::handleWrite() {
-            writeHandler(true);
+            logDebug("TcpStream::handleWrite() "  + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
+            if(!handleConnect()) {
+                  writeHandler();
+            }
       }
 
-      bool TcpStream::writeHandler(bool const fromTrigger) {
+      void TcpStream::writeHandler() {
+            logDebug("TcpStream::writeHandler() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
             std::lock_guard<std::mutex> sync(writeLock);
-            bool notify = false;
-            if(writeError) {
-                  return false;
-            }
-            if(waitingWriteEvent && !fromTrigger) {
-            } else {
-                  for(;;) {
-                        logDebug("TcpStream::writeHandler() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
-                        auto const q = writeQueue.removeAndIsEmpty();
-                        auto const empty = std::get<1>(q);
-                        if(empty) {
-                              notify = true;
-                              waitingWriteEvent = false;
+            bool wasEmpty = writeQueue.len() == 0;
+            for(;;) {
+                  auto const q = writeQueue.removeAndIsEmpty();
+                  auto const empty = std::get<1>(q);
+                  if(empty) {
+                        break;
+                  } else {
+                        auto const data = std::get<0>(q);
+                        auto const actuallySent = write(data);
+                        if((actuallySent - data.size()) == 0) {
+                              continue;
+                        } else if(actuallySent >= 0) {
+                              writeQueue.addFirst(Bytes(data.begin() + actuallySent, data.end()));
+                              continue;
+                        }else if(actuallySent == -1) {
+                              writeQueue.addFirst(data);
                               break;
-                        } else {
-                              auto const data = std::get<0>(q);
-                              auto const actuallySent = write(data);
-                              if(actuallySent - data.size() == 0) {
-                                    continue;
-                              } else if(actuallySent >= 0) {
-                                    writeQueue.addFirst(Bytes(data.begin() + actuallySent, data.end()));
-                                    continue;
-                              }else if(actuallySent == -1) {
-                                    waitingWriteEvent = true;
-                                    writeQueue.addFirst(data);
-                                    break;
-                              } else  {
-                                    logDebug(std::string("TcpStream::write failed"));
-                                    writeQueue.addFirst(data);
-                                    writeError = true;
-                                    notify = false;
-                                    break;
-                              }
                         }
                   }
             }
-            if(writeError) {
-                  disconnect();
+            if(!wasEmpty && writeQueue.len() == 0) {
+                  Engine::runAsync(notifyWriteComplete.get());
             }
-            return notify;
+
+      }
+
+      void TcpStream::asyncWriteComplete() {
+            logDebug("TcpStream::asyncWriteComplete() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
+            client->writeComplete();
       }
 
       void TcpStream::handleError() {
@@ -117,19 +111,7 @@ namespace Sb {
       void TcpStream::queueWrite(const Bytes& data) {
             logDebug("TcpStream::queueWrite() " + std::to_string(fd));
             writeQueue.addLast(data);
-            if(writeHandler()) {
-                  auto ref = client;
-                  if(ref) {
-                        ref->writeComplete();
-                  }
-            }
+            writeHandler();
       }
-      //
-      //    void TcpStream::handleTimer(size_t const timerId) {
-      //          logDebug("TcpListener::handleTimer() " + std::to_string(timerId) + " " + std::to_string(fd));
-      //          client->timeout(timerId);
-      //    }
-
-
 }
 
