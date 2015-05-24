@@ -23,7 +23,7 @@ namespace Sb {
       }
 
       void pErrorLog(int const error, int const fd) {
-            if(error < 0 && errno != EAGAIN) {
+            if(error < 0) {
                   auto errorText = std::string("pErrorLog: ") + std::string(::strerror(errno));
                   if(fd > 0) {
                         errorText += " " + std::to_string(fd);

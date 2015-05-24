@@ -15,14 +15,14 @@ namespace Sb {
             return runnable;
       }
 
-      Event& Event::operator=(Event const &rhs) {
+      Event& Event::operator=(Event const& rhs) {
             func = rhs.func;
             runnable = rhs.runnable;
             obj = rhs.obj;
             return *this;
       }
 
-      bool Event::operator==(Event const &rhs) const {
+      bool Event::operator==(Event const& rhs) const {
             return runnable == rhs.runnable;
       }
 

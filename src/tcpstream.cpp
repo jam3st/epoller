@@ -5,17 +5,15 @@ namespace Sb {
       void TcpStream::create(const int fd,
                              std::shared_ptr<TcpStreamIf>& client) {
             auto ref = std::make_shared<TcpStream>(fd, client);
-            client->tcpStream = ref;
             ref->notifyWriteComplete = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncWriteComplete, ref.get()));
+            client->tcpStream = ref;
             Engine::add(ref);
       }
 
       TcpStream::TcpStream(const int fd, std::shared_ptr<TcpStreamIf>& client) :
                               Socket(fd),
                               client(client),
-                              writeQueue({}),
-                              disconnected(false),
-                              notifiedConnect(false) {
+                              writeQueue({}) {
             Socket::makeNonBlocking(fd);
       }
 
@@ -27,6 +25,9 @@ namespace Sb {
       void TcpStream::handleRead() {
             logDebug("TcpStream::handleRead() " + std::to_string(fd));
             std::lock_guard<std::mutex> sync(readLock);
+            if(fatalReadError) {
+                  return;
+            }
             for(;;) {
                   Bytes data(MAX_PACKET_SIZE);
                   auto const actuallyRead = read(data);
@@ -36,6 +37,7 @@ namespace Sb {
                   } else if(actuallyRead == 0 || actuallyRead == -1) {
                         break;
                   } else {
+                        fatalReadError = true;
                         break;
                   }
             }
@@ -65,6 +67,9 @@ namespace Sb {
       void TcpStream::writeHandler() {
             logDebug("TcpStream::writeHandler() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
             std::lock_guard<std::mutex> sync(writeLock);
+            if(fatalWriteError) {
+                  return;
+            }
             bool wasEmpty = writeQueue.len() == 0;
             for(;;) {
                   auto const q = writeQueue.removeAndIsEmpty();
@@ -79,13 +84,15 @@ namespace Sb {
                         } else if(actuallySent >= 0) {
                               writeQueue.addFirst(Bytes(data.begin() + actuallySent, data.end()));
                               continue;
-                        }else if(actuallySent == -1) {
+                        } else if(actuallySent == -1) {
                               writeQueue.addFirst(data);
                               break;
+                        } else {
+                              fatalWriteError = true;
                         }
                   }
             }
-            if(!wasEmpty && writeQueue.len() == 0) {
+            if(!wasEmpty && writeQueue.len() == 0 && notifyWriteComplete) {
                   Engine::runAsync(notifyWriteComplete.get());
             }
 

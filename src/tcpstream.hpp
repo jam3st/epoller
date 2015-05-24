@@ -45,8 +45,10 @@ namespace Sb {
                   std::mutex readLock;
                   std::mutex errorLock;
                   SyncQueue<Bytes> writeQueue;
-                  bool disconnected;
-                  bool notifiedConnect;
+                  bool disconnected = false;
+                  bool notifiedConnect = false;
+                  bool fatalReadError = false;
+                  bool fatalWriteError = false;
                   std::unique_ptr<Event> notifyWriteComplete;
       };
 }

@@ -81,7 +81,6 @@ namespace Sb {
             } else if (error == -1 && (errno == EINTR || errno == EAGAIN || error == EWOULDBLOCK)) {
                   return -1;
             } else {
-                  pErrorLog(error, fd);
                   return -2;
             }
       }

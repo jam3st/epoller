@@ -125,9 +125,9 @@ namespace Sb {
             startWorkers(minWorkersPerCpu);
             doEpoll();
             blockSignals();
+            stopWorkers();
             theResolver.destroy();
             eventHash.clear();
-            stopWorkers();
       }
 
       void Engine::runAsync(Event* const event) {
