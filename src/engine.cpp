@@ -103,14 +103,17 @@ namespace Sb {
       void Engine::stopWorkers() {
             bool waiting = true;
             eventQueue.clear();
-            for(int i = MAX_SHUTDOWN_ATTEMPTS; i > 0 && waiting; i--) {
+            for(int i = 1024 * std::thread::hardware_concurrency(); i > 0 && waiting; i--) {
                   waiting = false;
                   for(auto& slave : slaves) {
                         if(!slave->exited) {
                               sem.signal();
                               waiting = true;
-                              std::this_thread::yield();
                         }
+                        else logError("EXITED");
+                  }
+                  if(waiting) {
+                        std::this_thread::sleep_for(THREAD_TERMINATE_WAIT_TIME);
                   }
             }
             assert(!waiting, "Engine::stopWorkers failed to stop");
@@ -119,14 +122,16 @@ namespace Sb {
             }
       }
 
-      void Engine::doInit(int minWorkersPerCpu) {
+      void Engine::doInit(int const minWorkersPerCpu) {
             assert(eventHash.size() > NUM_ENGINE_EVENTS || timerPending, "Engine::doInit Need to Add() something before Go().");
             initSignals();
             startWorkers(minWorkersPerCpu);
             doEpoll();
             blockSignals();
+            eventQueue.clear();
             stopWorkers();
             theResolver.destroy();
+logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx");
             eventHash.clear();
       }
 
@@ -200,7 +205,7 @@ namespace Sb {
             Engine::theEngine->doSetTrigger(when);
       }
 
-      void Engine::doSetTrigger(const NanoSecs& timeout) {
+      void Engine::doSetTrigger(NanoSecs const& timeout) {
             timerPending = true;
             itimerspec new_timer;
             new_timer.it_interval.tv_sec = 0;
@@ -270,6 +275,7 @@ namespace Sb {
       void Engine::doStop() {
             logDebug("Engine::doStop " + std::to_string(stopping));
 
+            stopping = true;
             if(epollTid != std::this_thread::get_id()) {
                   ::pthread_kill(epollThreadHandle, SIGUSR1);
             }
@@ -300,8 +306,8 @@ namespace Sb {
       void Engine::worker(Worker& me) {
             try {
                   sync();
-
-                  for(;;) {
+                  logDebug("Started worker");
+                  while(!stopping) {
                         sem.wait();
                         evHashLock.lock();
                         auto const q = eventQueue.removeAndIsEmpty();
@@ -331,6 +337,7 @@ namespace Sb {
             }
 
             me.exited = true;
+            logDebug("Stopped worker");
       }
 
       void Engine::doWork(Worker* me) noexcept {
@@ -386,5 +393,6 @@ namespace Sb {
                   logError("Unknown exception in Engine::epollThread");
                   stop();
             }
+            logDebug("Stopped Engine::Epoll");
       }
 }

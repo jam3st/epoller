@@ -26,7 +26,7 @@ namespace Sb {
                   static NanoSecs cancelTimer(Event* const timer);
                   ~Engine();
                   void sync();
-                  void startWorkers(int minWorkersPerCpu);
+                  void startWorkers(int const minWorkersPerCpu);
                   void stopWorkers();
 
             private:
@@ -55,8 +55,8 @@ namespace Sb {
                   void handleTimerExpired();
                   NanoSecs doSetTimer(Event* const timer, NanoSecs const& timeout);
                   NanoSecs doCancelTimer(Event* const timer);
-                  void doSetTrigger(const NanoSecs& timeout);
-                  void doInit(int minWorkersPerCpu);
+                  void doSetTrigger(NanoSecs const& timeout);
+                  void doInit(int const minWorkersPerCpu);
                   std::shared_ptr<Runnable> getSocket(Socket const* const ev);
                   void run(Socket* const sock, const uint32_t events) const;
                   void doEpoll();
@@ -83,8 +83,8 @@ namespace Sb {
                   Timers timers;
 
             private:
-                  const std::size_t NUM_ENGINE_EVENTS = 0;
-                  const std::size_t MAX_SHUTDOWN_ATTEMPTS = 500000;
-                  const std::size_t EPOLL_EVENTS_PER_RUN = 128;
+                  std::size_t const NUM_ENGINE_EVENTS = 0;
+                  std::size_t const EPOLL_EVENTS_PER_RUN = 128;
+                  NanoSecs const THREAD_TERMINATE_WAIT_TIME = NanoSecs{500'000};
       };
 }
