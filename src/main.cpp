@@ -181,7 +181,6 @@ class Remote : public TcpStreamIf {
             }
 
             virtual void received(const Bytes& x) override {
-                  logDebug("Remote received");
                   auto ref = ep.lock();
                   if(ref) {
                         ref->queueWrite(x);
@@ -189,7 +188,6 @@ class Remote : public TcpStreamIf {
             }
 
             virtual void connected() override {
-                  logDebug("Remote connected " + std::to_string(initWrite.size()));
                   std::lock_guard<std::mutex> sync(lock);
                   auto ref = tcpStream.lock();
                   if(initWrite.size() > 0) {
@@ -199,7 +197,6 @@ class Remote : public TcpStreamIf {
             }
 
             virtual void disconnected() override {
-                  logDebug("Remote onDisconnect");
                   auto ref = ep.lock();
                   if(ref) {
                         ref->disconnect();
@@ -256,11 +253,9 @@ class HttpProxy : public TcpStreamIf {
             }
 
             virtual void received(const Bytes& x) override {
-                  logDebug("HttpProxy onReadCompleted");
                   auto ref = ep.lock();
 
                   if(ref != nullptr) {
-                        logDebug("HttpProxy onReadCompleted to stream");
                         ref->doWrite(x);
                         return;
                   }
@@ -268,7 +263,6 @@ class HttpProxy : public TcpStreamIf {
                   header.insert(header.end(), x.begin(), x.end());
 
                   if(header.size() < 4) {
-                        logDebug("HttpProxy onReadCompleted without enough data");
                         return;
                   }
 
@@ -338,7 +332,6 @@ class HttpProxy : public TcpStreamIf {
             }
 
             virtual void writeComplete() override {
-                  logDebug("HttpProxy writeComplete");
             }
 
             virtual void disconnected() override {

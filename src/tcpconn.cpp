@@ -39,7 +39,7 @@ namespace Sb {
 
       void
       TcpConn::handleRead() {
-            logDebug("TcpConn::handleRead " + std::to_string(fd));
+            assert(false, "TcpConn::handleRead() is not a valid operation");
       }
 
       void TcpConn::createStream() {
@@ -57,12 +57,10 @@ namespace Sb {
 
       void
       TcpConn::handleWrite() {
-            logDebug("TcpConn::handleWrite " + std::to_string(fd));
             createStream();
       }
 
       void TcpConn::doConnect(std::shared_ptr<TcpConn>& ref, InetDest const& dest) {
-            logDebug("TcpConn::doConnect " + dest.toString() + " " + std::to_string(fd));
             std::lock_guard<std::mutex> sync(lock);
             added = true;
             connect(dest);

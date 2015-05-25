@@ -38,6 +38,8 @@ namespace Sb {
             ::signal(SIGUSR1, SIG_DFL);
             ::close(timerFd);
             ::close(epollFd);
+            theResolver.destroy();
+            assert(Engine::theEngine == nullptr, "Engine::~Engine() cannot call remove from twice");
             eventHash.clear();
             logDebug("Engine destroyed. To restart call Init() then Go().");
             Logger::stop();
@@ -110,7 +112,6 @@ namespace Sb {
                               sem.signal();
                               waiting = true;
                         }
-                        else logError("EXITED");
                   }
                   if(waiting) {
                         std::this_thread::sleep_for(THREAD_TERMINATE_WAIT_TIME);
@@ -130,9 +131,6 @@ namespace Sb {
             blockSignals();
             eventQueue.clear();
             stopWorkers();
-            theResolver.destroy();
-logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx");
-            eventHash.clear();
       }
 
       void Engine::runAsync(Event* const event) {
@@ -199,7 +197,7 @@ logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
       void Engine::setTrigger(NanoSecs const& when) {
             if(Engine::theEngine == nullptr) {
-                  throw std::runtime_error("Please call Engine::Init() first");
+                  return;
             }
 
             Engine::theEngine->doSetTrigger(when);
@@ -232,7 +230,8 @@ logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
       void Engine::add(const std::shared_ptr<Socket>& what) {
             if(Engine::theEngine == nullptr) {
-                  throw std::runtime_error("Please call Engine::Init() first");
+                  throw std::runtime_error("Engine::add Please call Engine::Init() first");
+                  return;
             }
             theEngine->doAdd(what);
       }
@@ -251,7 +250,8 @@ logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
       void Engine::remove(Socket* const what) {
             if(Engine::theEngine == nullptr) {
-                  throw std::runtime_error("Please call Engine::Init() first");
+                  logDebug("Engine::remove not available during shutdown");
+                  return;
             }
 
             theEngine->doRemove(what);
@@ -266,23 +266,19 @@ logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
       Resolver& Engine::resolver() {
             if(Engine::theEngine == nullptr) {
-                  throw std::runtime_error("Please call Engine::Init() first");
+                  throw std::runtime_error("Engine::add Please call Engine::Init() first");
             }
 
             return Engine::theEngine->theResolver;
       }
 
       void Engine::doStop() {
-            logDebug("Engine::doStop " + std::to_string(stopping));
-
-            stopping = true;
             if(epollTid != std::this_thread::get_id()) {
                   ::pthread_kill(epollThreadHandle, SIGUSR1);
             }
       }
 
       void Engine::run(Socket* const sock, const uint32_t events) const {
-            logDebug("Engine::Run " + pollEventsToString(events) + " " + std::to_string(sock->fd));
             if(sock->fd < 0) {
                   return;
             }
@@ -306,7 +302,6 @@ logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
       void Engine::worker(Worker& me) {
             try {
                   sync();
-                  logDebug("Started worker");
                   while(!stopping) {
                         sem.wait();
                         evHashLock.lock();
@@ -335,9 +330,7 @@ logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
                   logError("Unknown exception in Engine::worker");
                   Engine::theEngine->stop();
             }
-
             me.exited = true;
-            logDebug("Stopped worker");
       }
 
       void Engine::doWork(Worker* me) noexcept {
@@ -357,8 +350,6 @@ logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
       void Engine::doEpoll() {
             try {
-                  logDebug("Starting Engine::Epoll");
-
                   while(!stopping) {
                         epoll_event events[EPOLL_EVENTS_PER_RUN];
                         int num = epoll_wait(epollFd, events, EPOLL_EVENTS_PER_RUN, -1);
@@ -393,6 +384,5 @@ logError("ADSADASDASDDASDASDASjaskjasdasdaskjda XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
                   logError("Unknown exception in Engine::epollThread");
                   stop();
             }
-            logDebug("Stopped Engine::Epoll");
       }
 }

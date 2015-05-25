@@ -23,7 +23,6 @@ namespace Sb {
       }
 
       void TcpStream::handleRead() {
-            logDebug("TcpStream::handleRead() " + std::to_string(fd));
             std::lock_guard<std::mutex> sync(readLock);
             if(fatalReadError) {
                   return;
@@ -31,7 +30,6 @@ namespace Sb {
             for(;;) {
                   Bytes data(MAX_PACKET_SIZE);
                   auto const actuallyRead = read(data);
-                  logDebug("TcpStream::handleRead() read " + std::to_string(actuallyRead) + " "  + std::to_string(fd));
                   if(actuallyRead > 0) {
                         client->received(data);
                   } else if(actuallyRead == 0 || actuallyRead == -1) {
@@ -58,14 +56,12 @@ namespace Sb {
 
       }
       void TcpStream::handleWrite() {
-            logDebug("TcpStream::handleWrite() "  + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
             if(!handleConnect()) {
                   writeHandler();
             }
       }
 
       void TcpStream::writeHandler() {
-            logDebug("TcpStream::writeHandler() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
             std::lock_guard<std::mutex> sync(writeLock);
             if(fatalWriteError) {
                   return;
@@ -99,7 +95,6 @@ namespace Sb {
       }
 
       void TcpStream::asyncWriteComplete() {
-            logDebug("TcpStream::asyncWriteComplete() " + std::to_string(writeQueue.len()) + " " + std::to_string(fd));
             client->writeComplete();
       }
 
@@ -116,7 +111,6 @@ namespace Sb {
       }
 
       void TcpStream::queueWrite(const Bytes& data) {
-            logDebug("TcpStream::queueWrite() " + std::to_string(fd));
             writeQueue.addLast(data);
             writeHandler();
       }
