@@ -2,20 +2,18 @@
 
 namespace Sb {
       namespace TcpConnection {
-            void create(const struct InetDest& dest, std::shared_ptr<TcpStreamIf> client) {
+            void create(const struct InetDest &dest, std::shared_ptr<TcpStreamIf> client) {
                   auto ref = std::make_shared<TcpConn>(client, dest.port);
-                  logDebug("TcpConn::create() " + dest.toString() + " " + std::to_string(ref->getFd()));
                   ref->doConnect(ref, dest);
             }
 
-            void create(const std::string& dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client) {
+            void create(const std::string &dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client) {
                   InetDest inetDest = Socket::destFromString(dest, port);
 
                   if(inetDest.valid) {
                         create(inetDest, client);
                   } else {
                         auto ref = std::make_shared<TcpConn>(client, port);
-                        logDebug("TcpConn::create() " + dest + " " + std::to_string(ref->getFd()));
                         ref->self = ref;
                         std::shared_ptr<ResolverIf> res = ref;
                         Engine::resolver().resolve(res, dest);
@@ -23,13 +21,11 @@ namespace Sb {
             }
       }
 
-      TcpConn::TcpConn(std::shared_ptr<TcpStreamIf> client, uint16_t port) : Socket(Socket::createTcpSocket()), client(client), port(port), self(nullptr),
-                                                                             added(false) {
-            logDebug("TcpConn::TcpConn() " + std::to_string(fd));
+      TcpConn::TcpConn(std::shared_ptr<TcpStreamIf> client, uint16_t port) : Socket(Socket::createTcpSocket()), client(client), port(port),
+                                                                             self(nullptr), added(false) {
       }
 
       TcpConn::~TcpConn() {
-            logDebug("TcpConn::~TcpConn() " + std::to_string(fd));
             Engine::resolver().cancel(this);
             auto ref = client;
             if(ref != nullptr) {
@@ -39,33 +35,27 @@ namespace Sb {
 
       void
       TcpConn::handleRead() {
-            assert(false, "TcpConn::handleRead() is not a valid operation");
       }
 
-      void TcpConn::createStream() {
-            logDebug("TcpConn::createStream() " + std::to_string(fd));
+      void TcpConn::handleWrite() {
+      }
+
+      void TcpConn::doConnect(std::shared_ptr<TcpConn> &ref, InetDest const &dest) {
             std::lock_guard<std::mutex> sync(lock);
+            added = true;
             if(client) {
-                  // event still has a reference
+                  Engine::add(ref);
+                  connect(dest);
+                  // event still has a reference to shared_ptr<>(this)
                   Engine::remove(this);
                   auto const thisFd = releaseFd();
-                  TcpStream::create(thisFd, client);
+                  TcpStream::create(thisFd, client, true);
                   added = false;
                   client = nullptr;
             }
-      }
 
-      void
-      TcpConn::handleWrite() {
-            createStream();
-      }
-
-      void TcpConn::doConnect(std::shared_ptr<TcpConn>& ref, InetDest const& dest) {
-            std::lock_guard<std::mutex> sync(lock);
-            added = true;
-            connect(dest);
-            Engine::add(ref);
-            self = nullptr; // After add because self == ref when called from resolver
+            // After add because self == ref when called from resolver
+            self = nullptr;
       }
 
       void
@@ -83,14 +73,17 @@ namespace Sb {
             }
       }
 
-      void
-      TcpConn::resolved(IpAddr const& addr) {
+      bool TcpConn::waitingOutEvent() {
+            return true;
+      }
+
+      void TcpConn::resolved(IpAddr const& addr) {
             InetDest dest { addr, true, port };
             logDebug("resolved added " + dest.toString());
             doConnect(self, dest);
       }
 
-      void TcpConn::error() {
+      void TcpConn::notResolved() {
             logDebug("TcpConn resolver error not connecting");
             handleError();
       }

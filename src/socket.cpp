@@ -16,15 +16,11 @@ namespace Sb {
 
       Socket::Socket(int const fd) : fd(fd) {
             assert(fd > 0, "Unitialised fd");
-            logDebug("Socket::Socket()");
             Socket::makeNonBlocking(fd);
       }
 
       Socket::~Socket() {
-            logDebug("Socket::~Socket() closed and shutdown " + std::to_string(fd));
-
-            if(fd >= 0) {
-                  logDebug("Socket::~Socket() closed fd " + std::to_string(fd));
+           if(fd >= 0) {
                   ::close(fd);
             }
       }
@@ -75,7 +71,7 @@ namespace Sb {
             pErrorThrow(::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes), fd);
       }
 
-      ssize_t Socket::convertError(ssize_t const error) const {
+      ssize_t Socket::convertFromStdError(ssize_t const error) const {
             if(error >= 0) {
                   return error;
             } else if (error == -1 && (errno == EINTR || errno == EAGAIN || error == EWOULDBLOCK)) {
@@ -90,11 +86,11 @@ namespace Sb {
             if(numRead >= 0 && (data.size() - numRead) > 0) {
                   data.resize(numRead);
             }
-            return convertError(numRead);
+            return convertFromStdError(numRead);
       }
 
       ssize_t Socket::write(const Bytes& data) const {
-            return convertError(::write(fd, &data[0], data.size()));
+            return convertFromStdError(::write(fd, &data[0], data.size()));
       }
 
       void Socket::listen() const {
@@ -106,7 +102,7 @@ namespace Sb {
             socklen_t addrLen = sizeof addr.addrIn6;
             int aFd = ::accept(fd, &addr.addr, &addrLen);
             assert(addrLen == sizeof addr.addrIn6, "Buggy address len");
-            return convertError(aFd);
+            return convertFromStdError(aFd);
       }
 
       int Socket::receiveDatagram(InetDest& whereFrom, Bytes& data) const {
@@ -141,7 +137,6 @@ namespace Sb {
       }
 
       void Socket::bind(const uint16_t port) const {
-            logDebug("Socket::bind " + std::to_string(fd));
             makeNonBlocking(fd);
             SocketAddress addr;
             addr.addrIn6.sin6_family = AF_INET6;

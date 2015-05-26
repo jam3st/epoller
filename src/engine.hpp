@@ -18,8 +18,9 @@ namespace Sb {
                   static void start(int minWorkersPerCpu = 4);
                   static void stop();
                   static void init();
-                  static void add(const std::shared_ptr<Socket>& what);
+                  static void add(const std::shared_ptr<Socket>& what, bool const replace = false);
                   static void remove(Socket* const what);
+                  static void triggerWrites(Socket* const what);
                   static void runAsync(Event* const event);
                   static Resolver& resolver();
                   static NanoSecs setTimer(Event* const timer, NanoSecs const& timeout);
@@ -61,16 +62,17 @@ namespace Sb {
                   void run(Socket* const sock, const uint32_t events) const;
                   void doEpoll();
                   void worker(Worker& me);
-                  void doAdd(std::shared_ptr<Socket> const& what);
+                  void doAdd(std::shared_ptr<Socket> const& what, bool const replace);
                   void doRemove(Socket* const what);
+                  void doTriggerWrites(Socket* const what);
                   void doRunAsync(Event* const event);
 
             private:
                   static Engine* theEngine;
                   Semaphore sem;
                   SyncQueue<Event> eventQueue;
-                  std::atomic_bool stopping;
-                  std::atomic_bool timerPending;
+                  bool stopping;
+                  bool timerPending;
                   std::atomic_int activeCount;
                   std::thread::id epollTid;
                   std::thread::native_handle_type epollThreadHandle;

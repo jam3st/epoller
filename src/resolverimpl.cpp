@@ -8,7 +8,6 @@ namespace Sb {
       }
 
       ResolverImpl::~ResolverImpl() {
-            logDebug("ResolverImpl::~ResolverImpl");
             std::lock_guard<std::mutex> sync(lock);
             resQueries.clear();
       }
@@ -122,7 +121,7 @@ namespace Sb {
                   if(it->second.get(prefs, addr)) {
                         client->resolved(addr);
                   } else {
-                        client->error();
+                        client->notResolved();
                   }
             } else {
                   logDebug("adding request " + std::to_string(request));
@@ -176,7 +175,7 @@ namespace Sb {
                         resQueries.erase(it++);
                   }
             }
-            client->error();
+            client->notResolved();
       }
 
       void ResolverImpl::requestError(uint16_t const reqNo) {
@@ -245,7 +244,7 @@ namespace Sb {
 
                   if(completedError) {
                         logDebug("request complete with error " + std::to_string(ans.reqNo));
-                        client->error();
+                        client->notResolved();
                   } else {
                         logDebug("request complete as " + ipAddr.toString() + " " + std::to_string(ans.reqNo));
                         client->resolved(ipAddr);

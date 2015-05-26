@@ -24,9 +24,9 @@ namespace Sb {
                   virtual void handleRead() override;
                   virtual void handleWrite() override;
                   virtual void handleError() override;
+                  virtual bool waitingOutEvent() override;
                   virtual void resolved(IpAddr const& addr) override;
-                  virtual void error() override;
-                  void createStream();
+                  virtual void notResolved() override;
 
             private:
                   void doConnect(std::shared_ptr<TcpConn>& ref, InetDest const& dest);

@@ -22,7 +22,7 @@ namespace Sb {
 
       class TcpStream : virtual public Socket {
             public:
-                  static void create(const int fd, std::shared_ptr<TcpStreamIf>& client);
+                  static void create(const int fd, std::shared_ptr<TcpStreamIf>& client, bool const replace = false);
                   void queueWrite(const Bytes& data);
                   void disconnect();
                   TcpStream(const int fd, std::shared_ptr<TcpStreamIf>& client);
@@ -33,6 +33,7 @@ namespace Sb {
                   virtual void handleRead() override;
                   virtual void handleWrite() override;
                   virtual void handleError() override;
+                  virtual bool waitingOutEvent() override;
 
             private:
                   virtual bool handleConnect();
@@ -47,8 +48,8 @@ namespace Sb {
                   SyncQueue<Bytes> writeQueue;
                   bool disconnected = false;
                   bool notifiedConnect = false;
-                  bool fatalReadError = false;
-                  bool fatalWriteError = false;
+                  bool blocked = false;
+                  bool writeTriggered = false;
                   std::unique_ptr<Event> notifyWriteComplete;
       };
 }

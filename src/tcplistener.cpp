@@ -6,25 +6,20 @@
 namespace Sb {
       void
       TcpListener::create(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) {
-            auto tmp = std::make_shared<TcpListener>(port, clientFactory);
-            logDebug("TcpListener::create fd " + std::to_string(tmp->getFd()));
-            Engine::add(tmp);
+            Engine::add(std::make_shared<TcpListener>(port, clientFactory));
       }
 
       TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) : Socket(Socket::createTcpSocket()),
             clientFactory(clientFactory) {
-            logDebug(std::string("TcpListener::TcpListener " + std::to_string(port)));
             reuseAddress();
             bind(port);
             listen();
       }
 
       TcpListener::~TcpListener() {
-            logDebug("TcpListener::~TcpListener()");
       }
 
       void TcpListener::handleRead() {
-            logDebug("TcpListener::handleRead");
             std::lock_guard<std::mutex> sync(lock);
             for(;;) {
                   int const connFd = accept();
@@ -37,12 +32,16 @@ namespace Sb {
 
       }
 
+      bool TcpListener::waitingOutEvent() {
+            return false;
+      }
+
       void TcpListener::handleWrite() {
-            throw std::runtime_error("Epollable::handleWrite() not allowed " + std::to_string(fd));
+            throw std::runtime_error("TcpListener::handleWrite() not allowed " + std::to_string(fd));
       }
 
       void TcpListener::handleError() {
-            throw std::runtime_error("Epollable::handleError() " + std::to_string(fd));
+            throw std::runtime_error("TcpListener::handleError() " + std::to_string(fd));
       }
 
       void TcpListener::createStream(const int connFd) {

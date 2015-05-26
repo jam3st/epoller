@@ -21,7 +21,7 @@ namespace Sb {
       template<typename T>
       std::string intToHexString(T const& number) {
             std::stringstream stream;
-            stream << "0x" << std::setfill('0') << std::setw(sizeof(T) * 2) << std::hex << number;
+            stream << std::setfill('0') << std::hex << number;
             return stream.str();
       }
 }

@@ -18,6 +18,7 @@ namespace Sb {
                         errorText += " " + std::to_string(fd);
                   }
                   logError(errorText);
+                  __builtin_trap();
                   throw std::runtime_error(errorText);
             }
       }

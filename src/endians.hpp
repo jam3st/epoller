@@ -13,7 +13,7 @@ namespace Sb {
                   uint8_t b[sizeof(d32)];
             };
 
-            const bool bigEndian = [ ]() {
+            const bool bigEndian = []() {
                   return U16Swap { 0xb000 } .b[0] == 0xb0;
             };
 

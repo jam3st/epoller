@@ -2,12 +2,11 @@
 #include "tcpstream.hpp"
 
 namespace Sb {
-      void TcpStream::create(const int fd,
-                             std::shared_ptr<TcpStreamIf>& client) {
+      void TcpStream::create(const int fd, std::shared_ptr<TcpStreamIf>& client, bool const replace) {
             auto ref = std::make_shared<TcpStream>(fd, client);
             ref->notifyWriteComplete = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncWriteComplete, ref.get()));
             client->tcpStream = ref;
-            Engine::add(ref);
+            Engine::add(ref, replace);
       }
 
       TcpStream::TcpStream(const int fd, std::shared_ptr<TcpStreamIf>& client) :
@@ -18,24 +17,17 @@ namespace Sb {
       }
 
       TcpStream::~TcpStream() {
-            logDebug("TcpStream::~TcpStream() " + std::to_string(getFd()));
             client->disconnected();
       }
 
       void TcpStream::handleRead() {
             std::lock_guard<std::mutex> sync(readLock);
-            if(fatalReadError) {
-                  return;
-            }
             for(;;) {
                   Bytes data(MAX_PACKET_SIZE);
                   auto const actuallyRead = read(data);
                   if(actuallyRead > 0) {
                         client->received(data);
-                  } else if(actuallyRead == 0 || actuallyRead == -1) {
-                        break;
                   } else {
-                        fatalReadError = true;
                         break;
                   }
             }
@@ -47,8 +39,9 @@ namespace Sb {
                   if(notifiedConnect) {
                         return false;
                   } else {
-                        logDebug("TcpStream::handleConnect() " + std::to_string(fd));
                         notifiedConnect = true;
+                        writeTriggered = true;
+                        Engine::triggerWrites(this);
                   }
             }
             client->connected();
@@ -63,10 +56,9 @@ namespace Sb {
 
       void TcpStream::writeHandler() {
             std::lock_guard<std::mutex> sync(writeLock);
-            if(fatalWriteError) {
-                  return;
-            }
+            writeTriggered = false;
             bool wasEmpty = writeQueue.len() == 0;
+            blocked = false;
             for(;;) {
                   auto const q = writeQueue.removeAndIsEmpty();
                   auto const empty = q.second;
@@ -82,18 +74,23 @@ namespace Sb {
                               continue;
                         } else if(actuallySent == -1) {
                               writeQueue.addFirst(data);
+                              blocked = true;
                               break;
                         } else {
-                              fatalWriteError = true;
+                              blocked = false;
+                              break;
                         }
                   }
             }
             if(!wasEmpty && writeQueue.len() == 0 && notifyWriteComplete) {
                   Engine::runAsync(notifyWriteComplete.get());
             }
-
       }
 
+      bool TcpStream::waitingOutEvent()  {
+            std::lock_guard<std::mutex> sync(writeLock);
+            return blocked;
+      }
       void TcpStream::asyncWriteComplete() {
             client->writeComplete();
       }
@@ -112,7 +109,11 @@ namespace Sb {
 
       void TcpStream::queueWrite(const Bytes& data) {
             writeQueue.addLast(data);
-            writeHandler();
+            std::lock_guard<std::mutex> sync(writeLock);
+            if(!writeTriggered && !blocked) {
+                  writeTriggered = true;
+                  Engine::triggerWrites(this);
+            }
       }
 }
 

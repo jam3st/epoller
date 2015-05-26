@@ -7,6 +7,7 @@
 #include "udpsocket.hpp"
 #include "tcplistener.hpp"
 #include "tcpconn.hpp"
+#include <random>
 
 
 using namespace Sb;
@@ -73,20 +74,24 @@ class TcpSplat : public TcpStreamIf {
             }
 
             virtual void writeComplete() override {
-                  logDebug("TcpSplat writeComplete");
-                  std::stringstream stream;
-                  stream << std::endl << std::setfill('0') << std::setw(8) << std::dec << count++;
-                  auto str = stream.str();
-                  Bytes x(str.begin(), str.end());
-                  x.push_back('\r');
-                  auto ref = tcpStream.lock();
-                  if(ref) {
-                        logError("SPLAT");
-                        ref->queueWrite(x);
+                  std::uniform_int_distribution<uint32_t> randUint(1, 10000);
+                  auto thisRun = randUint(rng);
+                  logDebug("TcpSplat writeComplete " + std::to_string(thisRun));
+                  while(--thisRun != 0) {
+                        std::stringstream stream;
+                        stream << std::endl << std::setfill('0') << std::setw(8) << std::dec << count++;
+                        auto str = stream.str();
+                        Bytes x(str.begin(), str.end());
+                        x.push_back('\r');
+                        auto ref = tcpStream.lock();
+                        if(ref) {
+                              ref->queueWrite(x);
+                        }
                   }
             }
       private:
             size_t count;
+            std::mt19937 rng;
       };
 
 class TcpSink : public TcpStreamIf {
@@ -151,11 +156,9 @@ class TcpEcho : public TcpStreamIf {
             }
 
             virtual void disconnected() override {
-                  logDebug("TcpEcho onDisconnect");
             }
 
             virtual void writeComplete() override {
-                  logDebug("TcpEcho writeComplete");
             }
       private:
             Bytes initWrite;
@@ -165,14 +168,12 @@ class TcpEcho : public TcpStreamIf {
 class Remote : public TcpStreamIf {
       public:
             Remote(const std::weak_ptr<TcpStream> ep, Bytes& initWrite) : ep(ep), initWrite(initWrite) {
-                  logDebug("Remote created initial " + std::to_string(initWrite.size()));
             }
+
             virtual ~Remote() {
-                  logDebug("~Remote destroyed");
             }
 
             virtual void disconnect() override {
-                  logDebug("Remote disconnect");
                   auto ref = tcpStream.lock();
 
                   if(ref) {
@@ -204,8 +205,8 @@ class Remote : public TcpStreamIf {
             }
 
             virtual void writeComplete() override {
-                  logDebug("Remote writeComplete");
             }
+
             void doWrite(const Bytes& x) {
                   auto ref = tcpStream.lock();
 
@@ -231,20 +232,13 @@ class Remote : public TcpStreamIf {
 
 class HttpProxy : public TcpStreamIf {
       public:
-            HttpProxy() {
-                  logDebug("HttpProxy::HttpProxy");
-            }
-
             virtual ~HttpProxy() {
-                  logDebug("~HttpProxy destroyed");
             }
 
             virtual void connected() override {
-                  logDebug("HttpProxy connected");
             }
 
             virtual void disconnect() override {
-                  logDebug("HttpProxy disconnect");
                   auto ref = tcpStream.lock();
 
                   if(ref) {
@@ -288,7 +282,6 @@ class HttpProxy : public TcpStreamIf {
                         }
 
                         Bytes getPost(start, crPos);
-                        logDebug("line: " + std::string { getPost.begin(), getPost.end() });
                         auto it = findFirstPattern(getPost.begin(), getPost.end(), { 'H', 'O', 'S', 'T', ':', '?' });
 
                         if(it.first != it.second) {
@@ -298,8 +291,6 @@ class HttpProxy : public TcpStreamIf {
                               if(delim != std::string::npos) {
                                     host.resize(delim);
                               }
-
-                              logDebug("host: " + host);
                         }
 
                         if(crPos + 1 == header.end()) {
@@ -335,7 +326,6 @@ class HttpProxy : public TcpStreamIf {
             }
 
             virtual void disconnected() override {
-                  logDebug("HttpProxy::disconnected");
                   auto ref = ep.lock();
 
                   if(ref) {
@@ -350,7 +340,7 @@ class HttpProxy : public TcpStreamIf {
 
 class ResolveNameSy : public ResolverIf {
       public:
-            virtual void error() override {
+            virtual void notResolved() override {
                   logDebug("ResolveNameSy	error");
             }
             virtual void resolved(const IpAddr& /*addr*/) override {
@@ -370,7 +360,7 @@ class ExitTimer : public Runnable {
                   timer3 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 3));
                   timer4 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 4));
                   Engine::cancelTimer(timer0.get());
-                  Engine::setTimer(timer0.get(), NanoSecs { 10000000000 });
+                  Engine::setTimer(timer0.get(), NanoSecs { 5000000000 });
                   Engine::setTimer(timer4.get(), NanoSecs { 4000000000 });
                   Engine::setTimer(timer3.get(), NanoSecs { 3000000000 });
                   Engine::setTimer(timer1.get(), NanoSecs { 1000000000 });
@@ -416,23 +406,18 @@ class NameServer : public UdpSocketIf {
 
 int main(const int, const char*const argv[]) {
 	::close(0);
-//      auto exitTimer = std::make_shared<ExitTimer>();
+      auto exitTimer = std::make_shared<ExitTimer>();
 //	runUnit("timer", [&exitTimer]() {
-//          exitTimer->setTimers();
-//	});
+//         exitTimer->setTimers();
+//      });
 //      exitTimer.reset();
 //      runUnit("resolve",[] () {
-//            Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "asdasdasd", Resolver::AddrPref::AnyAddr);
+//           Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "asdasdasd", Resolver::AddrPref::AnyAddr);
 //      });
 //
 //      runUnit("resolve",[] () {
 //            Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "ipv6.google.com", Resolver::AddrPref::AnyAddr);
 //      });
-      runUnit("httpproxy",[] () {
-            TcpListener::create(1024, [ ]() {
-                   return std::make_shared<HttpProxy>();
-            });
-      });
 //      runUnit("nameserver",[] () {
 //            UdpSocket::create(1024, std::make_shared<NameServer>());
 //      });
@@ -451,6 +436,11 @@ int main(const int, const char*const argv[]) {
 //                  return std::make_shared<TcpSplat>();
 //            });
 //      });
+      runUnit("httpproxy",[] () {
+            TcpListener::create(1024, [ ]() {
+                  return std::make_shared<HttpProxy>();
+            });
+      });
 
       return 0;
 }

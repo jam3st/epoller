@@ -101,6 +101,9 @@ namespace Sb {
             }
       }
 
+      bool UdpSocket::waitingOutEvent() {
+            return false;
+      }
       void UdpSocket::handleError() {
             logDebug("UdpSocket::handleError() is closed");
             client->disconnected();

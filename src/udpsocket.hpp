@@ -30,6 +30,7 @@ namespace Sb {
                   virtual void handleRead() override;
                   virtual void handleWrite() override;
                   virtual void handleError() override;
+                  virtual bool waitingOutEvent() override;
                   void doWrite(const InetDest& dest, const Bytes& data);
                   UdpSocket(std::shared_ptr<UdpSocketIf> client);
             private:

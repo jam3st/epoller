@@ -21,6 +21,7 @@ namespace Sb {
                   virtual void handleError() = 0;
                   virtual void handleRead() = 0;
                   virtual void handleWrite() = 0;
+                  virtual bool waitingOutEvent() = 0;
             protected:
                   mutable int fd;
             protected:
@@ -41,7 +42,7 @@ namespace Sb {
                   int receiveDatagram(InetDest& whereFrom, Bytes& data) const;
                   int sendDatagram(const InetDest& whereTo, const Bytes& data) const;
             private:
-                  ssize_t convertError(ssize_t const error) const;
+                  ssize_t convertFromStdError(ssize_t const error) const;
             private:
                   const int LISTEN_MAX_PENDING = 64;
       };

@@ -54,8 +54,6 @@ namespace Sb {
             if(timesByDate.size() > 0) {
                   auto const trigger = std::max(NanoSecs{ 1 }, NanoSecs { timesByDate.begin()->first - SteadyClock::now() });
                   armTimer(trigger);
-            } else {
-                  armTimer(NanoSecs{ 0 });
             }
       }
 

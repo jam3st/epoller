@@ -9,7 +9,7 @@
 namespace Sb {
       class ResolverIf {
             public:
-                  virtual void error() = 0;
+                  virtual void notResolved() = 0;
                   virtual void resolved(IpAddr const &addr) = 0;
       };
 
