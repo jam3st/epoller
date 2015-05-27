@@ -20,12 +20,16 @@ namespace Sb {
       }
 
       void TcpListener::handleRead() {
-            std::lock_guard<std::mutex> sync(lock);
             for(;;) {
-                  int const connFd = accept();
+                  int connFd = -1;
+                  {
+                        std::lock_guard<std::mutex> sync(lock);
+                        connFd = accept();
+                  }
+
                   if(connFd >= 0) {
                         createStream(connFd);
-                  } else if(connFd == -1) {
+                  } else {
                         break;
                   }
             }

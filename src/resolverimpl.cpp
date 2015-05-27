@@ -62,8 +62,7 @@ namespace Sb {
                   const Query::Qtype qType;
       };
 
-      bool
-      ResolverImpl::Names::get(Resolver::AddrPref const& prefs, IpAddr& addr) const {
+      bool ResolverImpl::Names::get(Resolver::AddrPref const& prefs, IpAddr& addr) const {
             addr.d =  {};
             bool found = false;
             bool once = false;
@@ -96,8 +95,7 @@ namespace Sb {
             return found;
       }
 
-      void
-      ResolverImpl::Names::put(const Query::Qanswer& ans) {
+      void ResolverImpl::Names::put(const Query::Qanswer& ans) {
             logDebug("Resolver::put " + std::to_string(ans.addr.size()));
 
             for(const auto& addr : ans.addr) {
@@ -115,7 +113,6 @@ namespace Sb {
             auto it = byName.find(name);
 
             if(it != byName.end()) {
-                  logDebug("resolve cache hit");
                   IpAddr addr;
 
                   if(it->second.get(prefs, addr)) {
@@ -146,8 +143,7 @@ namespace Sb {
             }
       }
 
-      void
-      ResolverImpl::cancel(const ResolverIf* /*client*/) {
+      void ResolverImpl::cancel(const ResolverIf* /*client*/) {
             std::lock_guard<std::mutex> sync(lock);
             //          auto it = byName.find(&name);
       }
@@ -182,8 +178,7 @@ namespace Sb {
             logDebug("ResolverImpl::requestError " + std::to_string(reqNo));
       }
 
-      void
-      ResolverImpl::requestComplete(std::uint16_t const reqNo, Query::Qanswer const& ans) {
+      void ResolverImpl::requestComplete(std::uint16_t const reqNo, Query::Qanswer const& ans) {
             logDebug("ResolverImpl::requestComplete " + std::to_string(ans.reqNo));
             std::shared_ptr<ResolverIf> client;
             Resolver::AddrPref prefs;

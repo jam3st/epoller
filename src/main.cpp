@@ -62,13 +62,6 @@ class TcpSplat : public TcpStreamIf {
                   logDebug("TcpSplat received " + std::to_string(x.size()));
             }
 
-            virtual void connected() override {
-                  logDebug("TcpSplat connected");
-                  auto ref = tcpStream.lock();
-                  ref->queueWrite({'S', 'p', 'l', 'a', 't', '\r', '\n'});
-
-            }
-
             virtual void disconnected() override {
                   logDebug("TcpSplat onDisconnect");
             }
@@ -79,10 +72,9 @@ class TcpSplat : public TcpStreamIf {
                   logDebug("TcpSplat writeComplete " + std::to_string(thisRun));
                   while(--thisRun != 0) {
                         std::stringstream stream;
-                        stream << std::endl << std::setfill('0') << std::setw(8) << std::dec << count++;
+                        stream << std::setfill('0') << std::setw(8) << std::dec << count++ << std::endl;
                         auto str = stream.str();
                         Bytes x(str.begin(), str.end());
-                        x.push_back('\r');
                         auto ref = tcpStream.lock();
                         if(ref) {
                               ref->queueWrite(x);
@@ -111,10 +103,6 @@ class TcpSink : public TcpStreamIf {
                   logDebug("TcpSink received " + std::to_string(x.size()));
             }
 
-            virtual void connected() override {
-                  logDebug("TcpSink connected");
-            }
-
             virtual void disconnected() override {
                   logDebug("TcpSink onDisconnect");
             }
@@ -126,7 +114,7 @@ class TcpSink : public TcpStreamIf {
 
 class TcpEcho : public TcpStreamIf {
       public:
-            TcpEcho() : initWrite({'H', 'e', 'l', 'l', 'o', '\r', '\n'}) {
+            TcpEcho() : initWrite({}) {
                   logDebug("TcpEcho created initial " + std::to_string(initWrite.size()));
             }
             virtual ~TcpEcho() {
@@ -145,8 +133,11 @@ class TcpEcho : public TcpStreamIf {
                   }
             }
 
-            virtual void connected() override {
-                  logDebug("TcpEcho connected " + std::to_string(initWrite.size()));
+            virtual void disconnected() override {
+            }
+
+            virtual void writeComplete() override {
+                  logDebug("TcpEcho writeComplete " + std::to_string(initWrite.size()));
                   std::lock_guard<std::mutex> sync(lock);
                   auto ref = tcpStream.lock();
                   if(initWrite.size() > 0) {
@@ -155,11 +146,6 @@ class TcpEcho : public TcpStreamIf {
                   }
             }
 
-            virtual void disconnected() override {
-            }
-
-            virtual void writeComplete() override {
-            }
       private:
             Bytes initWrite;
             std::mutex lock;
@@ -188,15 +174,6 @@ class Remote : public TcpStreamIf {
                   }
             }
 
-            virtual void connected() override {
-                  std::lock_guard<std::mutex> sync(lock);
-                  auto ref = tcpStream.lock();
-                  if(initWrite.size() > 0) {
-                        ref->queueWrite(initWrite);
-                        initWrite.resize(0);
-                  }
-            }
-
             virtual void disconnected() override {
                   auto ref = ep.lock();
                   if(ref) {
@@ -205,19 +182,28 @@ class Remote : public TcpStreamIf {
             }
 
             virtual void writeComplete() override {
-            }
-
-            void doWrite(const Bytes& x) {
                   auto ref = tcpStream.lock();
-
                   if(ref) {
                         std::lock_guard<std::mutex> sync(lock);
                         if(initWrite.size() > 0) {
                               ref->queueWrite(initWrite);
                               initWrite.resize(0);
                         }
+                  }
+            }
+
+            void doWrite(const Bytes& x) {
+                  std::lock_guard<std::mutex> sync(lock);
+                  auto ref = tcpStream.lock();
+
+                  if(ref) {
+                        if(initWrite.size() > 0) {
+                              ref->queueWrite(initWrite);
+                              initWrite.resize(0);
+                        }
                         ref->queueWrite(x);
                   } else {
+                        logError("WHAT???");
                         for(auto c : x) {
                               initWrite.push_back(c);
                         }
@@ -235,9 +221,6 @@ class HttpProxy : public TcpStreamIf {
             virtual ~HttpProxy() {
             }
 
-            virtual void connected() override {
-            }
-
             virtual void disconnect() override {
                   auto ref = tcpStream.lock();
 
@@ -249,14 +232,16 @@ class HttpProxy : public TcpStreamIf {
             virtual void received(const Bytes& x) override {
                   auto ref = ep.lock();
 
-                  if(ref != nullptr) {
+                  if(ref) {
                         ref->doWrite(x);
                         return;
+                  } else {
+                        header.insert(header.end(), x.begin(), x.end());
                   }
 
-                  header.insert(header.end(), x.begin(), x.end());
 
                   if(header.size() < 4) {
+                        logDebug("HttpProxy onReadCompleted is too short");
                         return;
                   }
 
@@ -304,9 +289,9 @@ class HttpProxy : public TcpStreamIf {
                   auto it = findFirstPattern(header.begin(), header.end(), { 'C', 'O', 'N', 'N', 'E', 'C', 'T', ' ' });
 
                   if(it.first != it.second) {
-                        header.resize(0);
+                        header.erase(header.begin(), doubleCr.second + 1);
                         port = 443;
-                  }
+                  };
 
                   auto sp = std::make_shared<Remote>(tcpStream, header);
                   TcpConnection::create(host, port, sp);
@@ -315,8 +300,15 @@ class HttpProxy : public TcpStreamIf {
                   if(port == 443) {
                         auto ref = tcpStream.lock();
                         if(ref) {
-                              ref->queueWrite({ 'H', 'T', 'T', 'P', '/', '1', '.', '1', ' ', '2', '0', '0', ' ', 'O', 'K', '\r', '\n', '\r', '\n' });
+                              ref->queueWrite({ 'H', 'T', 'T', 'P', '/', '1', '.', '1', ' ', '2', '0', '0', ' ', 'O', 'K', '\n', '\n' });
                         } else {
+                              logError("RACE");
+                              disconnected();
+                        }
+                  } else {
+                        auto ref = tcpStream.lock();
+                        if(!ref) {
+                              logError("RACE");
                               disconnected();
                         }
                   }
@@ -406,7 +398,7 @@ class NameServer : public UdpSocketIf {
 
 int main(const int, const char*const argv[]) {
 	::close(0);
-      auto exitTimer = std::make_shared<ExitTimer>();
+//  auto exitTimer = std::make_shared<ExitTimer>();
 //	runUnit("timer", [&exitTimer]() {
 //         exitTimer->setTimers();
 //      });

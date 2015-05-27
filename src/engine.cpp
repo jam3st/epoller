@@ -221,8 +221,11 @@ namespace Sb {
       }
 
       void Engine::doSetTrigger(NanoSecs const& timeout) {
-            {
-                  std::lock_guard<std::mutex> sync(evHashLock);
+            std::lock_guard<std::mutex> sync(evHashLock);
+            if(timeout == NanoSecs{0}) {
+                  timerPending = false;
+                  return;
+            } else {
                   timerPending = true;
             }
 
@@ -239,25 +242,25 @@ namespace Sb {
             pErrorThrow(::timerfd_settime(timerFd, 0, &new_timer, &old_timer), timerFd);
       }
 
-      void Engine::doAdd(const std::shared_ptr<Socket>& what, bool const replace) {
+      void Engine::doAdd(const std::shared_ptr<Socket>& what) {
             std::lock_guard<std::mutex> sync(evHashLock);
             if(!stopping) {
                   eventHash.insert(std::make_pair(what.get(), what));
                   epoll_event event = { 0, { 0 }};
                   event.events = what.get()->waitingOutEvent() ? EPOLLOUT : 0;
-                  event.events = EPOLLONESHOT | EPOLLIN | EPOLLERR | EPOLLRDHUP | EPOLLET;
+                  event.events |= EPOLLONESHOT | EPOLLIN | EPOLLERR | EPOLLRDHUP | EPOLLET;
                   event.data.ptr = what.get();
-                  pErrorThrow(::epoll_ctl(epollFd, replace ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, what->getFd(), &event), epollFd);
+                  pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_ADD, what->getFd(), &event), epollFd);
             } else {
                   throw std::runtime_error("Cannot add when engine is stopping.");
             }
       }
 
-      void Engine::add(const std::shared_ptr<Socket>& what, bool const replace) {
+      void Engine::add(const std::shared_ptr<Socket>& what) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Engine::add Please call Engine::Init() first");
             }
-            theEngine->doAdd(what, replace);
+            theEngine->doAdd(what);
       }
 
       void Engine::doRemove(Socket* const what) {
@@ -269,16 +272,15 @@ namespace Sb {
 
 
             if(!stoppingSync) {
-                  timers.cancelAllTimers(what);
                   decltype(eventHash)::const_iterator it;
                   {
-                        std::lock_guard<std::mutex> sync(evHashLock);
+                        std::lock_guard <std::mutex> sync(evHashLock);
                         it = eventHash.find(what);
                         assert(it != eventHash.end(), "Not found for removal");
                         eventHash.erase(it);
+                        auto dummy = Event(it->second, []() { });
+                        eventQueue.removeAll(&dummy);
                   }
-                  auto dummy = Event(it->second, []() { });
-                  eventQueue.removeAll(&dummy);
             }
       }
 
@@ -322,17 +324,17 @@ namespace Sb {
 
             if((events & EPOLLRDHUP) != 0 || (events & EPOLLERR) != 0) {
                   sock->handleError();
-            }
+            } else {
+                  if(sock->fd < 0) {
+                        return;
+                  }
 
-            if(sock->fd < 0) {
-                  return;
+                  epoll_event event = {0, {0}};
+                  event.events = sock->waitingOutEvent() ? EPOLLOUT : 0;
+                  event.events |= EPOLLONESHOT | EPOLLIN | EPOLLERR | EPOLLRDHUP | EPOLLET;
+                  event.data.ptr = sock;
+                  ::epoll_ctl(epollFd, EPOLL_CTL_MOD, sock->fd, &event);
             }
-
-            epoll_event event = {0, {0}};
-            event.events = sock->waitingOutEvent() ? EPOLLOUT : 0;
-            event.events |= EPOLLONESHOT | EPOLLIN | EPOLLERR | EPOLLRDHUP | EPOLLET;
-            event.data.ptr = sock;
-            pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_MOD, sock->fd, &event), epollFd);
       }
 
       void Engine::sync() {
@@ -399,23 +401,19 @@ namespace Sb {
                                     break;
                               }
                         }
-                        epoll_event events[EPOLL_EVENTS_PER_RUN];
-                        int num = epoll_wait(epollFd, events, EPOLL_EVENTS_PER_RUN, -1);
+                        epoll_event epEvents[EPOLL_EVENTS_PER_RUN];
+                        int num = epoll_wait(epollFd, epEvents, EPOLL_EVENTS_PER_RUN, -1);
 
                         if(num >= 0) {
                               for(int i = 0; i < num; ++i) {
-                                    if(events[i].data.ptr == nullptr) {
+                                    if(epEvents[i].data.ptr == nullptr) {
                                           handleTimerExpired();
                                     } else {
-                                          auto sock = static_cast<Socket*>(events[i].data.ptr);
+                                          auto sock = static_cast<Socket*>(epEvents[i].data.ptr);
                                           auto ev = getSocket(sock);
-                                          auto const evts = events[i].events;
+                                          auto const events = epEvents[i].events;
                                           if(ev) {
-                                                if((evts & EPOLLRDHUP) != 0 || (evts & EPOLLERR) != 0) {
-                                                      eventQueue.addFirst(Event(ev, std::bind(&Engine::run, this, sock, evts)));
-                                                } else {
-                                                      eventQueue.addLast(Event(ev, std::bind(&Engine::run, this, sock, evts)));
-                                                }
+                                                eventQueue.addLast(Event(ev, std::bind(&Engine::run, this, sock, events)));
                                                 sem.signal();
                                           }
                                     }

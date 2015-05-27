@@ -12,18 +12,10 @@ BIN_DIR       = $(BUILD_DIR)/bin
 SB_OBJS_DIR = $(BUILD_DIR)/objs
 
 SB_SRC_DIR   = .
-
-SB_SRCS = main.cpp \
-clock.cpp    event.cpp         query.cpp         resouces.cpp   tcpconn.cpp      timers.cpp            tlstcpstream.cpp \
-enc_ocb.cpp  logger.cpp        resolver.cpp      semaphore.cpp  tcplistener.cpp  tlsclientwrapper.cpp  udpsocket.cpp \
-engine.cpp   resolverimpl.cpp  socket.cpp     tcpstream.cpp    tlscredentials.cpp    utils.cpp
-
+SB_SRCS = \
+clock.cpp counters.cpp enc_ocb.cpp engine.cpp event.cpp logger.cpp main.cpp query.cpp resolver.cpp resolverimpl.cpp resouces.cpp semaphore.cpp socket.cpp tcpconn.cpp tcplistener.cpp tcpstream.cpp timers.cpp tlsclientwrapper.cpp tlscredentials.cpp tlstcpstream.cpp udpsocket.cpp utils.cpp
 SB_HDRS = \
-clock.hpp    logger.hpp        resouces.hpp   tcpconn.hpp      tlsclientwrapper.hpp  udpsocket.hpp \
-endians.hpp  query.hpp         semaphore.hpp  tcplistener.hpp  tlscredentials.hpp    utils.hpp \
-engine.hpp   resolver.hpp      socket.hpp     tcpstream.hpp    tlstcpstream.hpp \
-event.hpp    resolverimpl.hpp  syncqueue.hpp  timers.hpp       types.hpp
-
+clock.hpp counters.hpp endians.hpp engine.hpp event.hpp logger.hpp query.hpp resolver.hpp resolverimpl.hpp resouces.hpp semaphore.hpp socket.hpp syncqueue.hpp tcpconn.hpp tcplistener.hpp tcpstream.hpp timers.hpp tlsclientwrapper.hpp tlscredentials.hpp tlstcpstream.hpp types.hpp udpsocket.hpp utils.hpp
 
 TEST_EXE    = sblade
 SB_OBJS     = ${SB_SRCS:%.cpp=$(SB_OBJS_DIR)/%.o}

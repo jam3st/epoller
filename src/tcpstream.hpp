@@ -4,6 +4,7 @@
 #include "engine.hpp"
 #include "socket.hpp"
 #include "types.hpp"
+#include "counters.hpp"
 
 namespace Sb {
       class TcpStream;
@@ -11,7 +12,6 @@ namespace Sb {
       class TcpStreamIf : public std::enable_shared_from_this<TcpStreamIf> {
             public:
                   friend class TcpStream;
-                  virtual void connected() = 0;
                   virtual void disconnect() = 0;
                   virtual void received(const Bytes&) = 0;
                   virtual void writeComplete() = 0;
@@ -22,7 +22,8 @@ namespace Sb {
 
       class TcpStream : virtual public Socket {
             public:
-                  static void create(const int fd, std::shared_ptr<TcpStreamIf>& client, bool const replace = false);
+                  static void create(const int fd, std::shared_ptr<TcpStreamIf>& client);
+                  static void create(const int fd, std::shared_ptr<TcpStreamIf>& client, InetDest const& dest);
                   void queueWrite(const Bytes& data);
                   void disconnect();
                   TcpStream(const int fd, std::shared_ptr<TcpStreamIf>& client);
@@ -36,9 +37,8 @@ namespace Sb {
                   virtual bool waitingOutEvent() override;
 
             private:
-                  virtual bool handleConnect();
                   virtual void asyncWriteComplete();
-                  virtual void writeHandler();
+                  virtual void asyncConnectCheck();
 
             private:
                   std::shared_ptr<TcpStreamIf> client;
@@ -46,11 +46,14 @@ namespace Sb {
                   std::mutex readLock;
                   std::mutex errorLock;
                   SyncQueue<Bytes> writeQueue;
+                  bool blocked = true;
+                  bool connected = false;
                   bool disconnected = false;
-                  bool notifiedConnect = false;
-                  bool blocked = false;
                   bool writeTriggered = false;
+                  bool once = false;
                   std::unique_ptr<Event> notifyWriteComplete;
+                  std::unique_ptr<Event> connectTimer;
+                  Counters counters;
       };
 }
 

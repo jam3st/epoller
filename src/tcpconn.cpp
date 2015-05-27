@@ -44,12 +44,8 @@ namespace Sb {
             std::lock_guard<std::mutex> sync(lock);
             added = true;
             if(client) {
-                  Engine::add(ref);
-                  connect(dest);
-                  // event still has a reference to shared_ptr<>(this)
-                  Engine::remove(this);
                   auto const thisFd = releaseFd();
-                  TcpStream::create(thisFd, client, true);
+                  TcpStream::create(thisFd, client, dest);
                   added = false;
                   client = nullptr;
             }
@@ -79,7 +75,6 @@ namespace Sb {
 
       void TcpConn::resolved(IpAddr const& addr) {
             InetDest dest { addr, true, port };
-            logDebug("resolved added " + dest.toString());
             doConnect(self, dest);
       }
 

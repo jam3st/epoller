@@ -54,6 +54,8 @@ namespace Sb {
             if(timesByDate.size() > 0) {
                   auto const trigger = std::max(NanoSecs{ 1 }, NanoSecs { timesByDate.begin()->first - SteadyClock::now() });
                   armTimer(trigger);
+            } else {
+                  armTimer(NanoSecs{0});
             }
       }
 
@@ -69,7 +71,7 @@ namespace Sb {
             return timerCount;
       }
 
-      NanoSecs Timers::setTimer(Runnable * const what, Event * const timer, const NanoSecs& timeout) {
+      NanoSecs Timers::setTimer(Runnable* const what, Event* const timer, const NanoSecs& timeout) {
             auto now = SteadyClock::now();
             TimePointNs when = now + timeout;
             std::lock_guard<std::mutex> lock(timeLock);
