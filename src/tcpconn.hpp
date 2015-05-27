@@ -13,29 +13,20 @@ namespace Sb {
             void create(const std::string& dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client);
       }
 
-      class TcpConn final
-            : public Socket,
-              public ResolverIf {
+      class TcpConn final : public ResolverIf {
             public:
                   friend void TcpConnection::create(const std::string& dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client);
                   friend void TcpConnection::create(const InetDest& dest, std::shared_ptr<TcpStreamIf> client);
                   TcpConn(std::shared_ptr<TcpStreamIf> client, uint16_t port);
                   virtual ~TcpConn();
-                  virtual void handleRead() override;
-                  virtual void handleWrite() override;
-                  virtual void handleError() override;
-                  virtual bool waitingOutEvent() override;
                   virtual void resolved(IpAddr const& addr) override;
                   virtual void notResolved() override;
-
             private:
-                  void doConnect(std::shared_ptr<TcpConn>& ref, InetDest const& dest);
-
+                  virtual void doConnect(std::shared_ptr<TcpConn> &ref, InetDest const &dest);
             private:
                   std::shared_ptr<TcpStreamIf> client;
                   uint16_t port;
                   std::shared_ptr<TcpConn> self;
-                  bool added;
                   std::mutex lock;
       };
 }

@@ -55,7 +55,7 @@ namespace Sb {
 
       void UdpSocket::disconnect() {
             logDebug("UdpSocket::disconnect() " + std::to_string(fd));
-            Engine::remove(this);
+            Engine::remove(self);
       }
 
       void UdpSocket::doWrite(const InetDest& dest, const Bytes& data) {
@@ -78,7 +78,7 @@ namespace Sb {
             decltype(actuallySent) dataLen = data.size();
 
             if(actuallySent == dataLen) {
-                  logDebug("Write " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen) + " on " + std::to_string(getFd()));
+                  logDebug("Write " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen) + " on " + std::to_string(fd));
             } else if(actuallySent > 0) {
                   logDebug("Partial write of " + std::to_string(actuallySent) + " out of " + std::to_string(dataLen));
                   writeQueue.addLast(std::make_pair<const InetDest, const Bytes>(InetDest(dest), Bytes(data.begin() + actuallySent, data.end())));

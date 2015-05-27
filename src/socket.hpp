@@ -11,10 +11,6 @@ namespace Sb {
                   enum SockType {
                         UDP = 1, TCP = 2
                   };
-            protected:
-                  virtual int getFd() const final;
-                  virtual int releaseFd() const final;
-                  virtual bool fdReleased() const final;
       private:
                   friend class Engine;
 
@@ -23,7 +19,8 @@ namespace Sb {
                   virtual void handleWrite() = 0;
                   virtual bool waitingOutEvent() = 0;
             protected:
-                  mutable int fd;
+                  int const fd;
+                  std::weak_ptr<Socket> self;
             protected:
                   virtual ~Socket();
                   static int createSocket(const SockType type);

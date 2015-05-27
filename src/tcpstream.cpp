@@ -2,7 +2,7 @@
 #include "tcpstream.hpp"
 
 namespace Sb {
-      void TcpStream::create(const int fd, std::shared_ptr<TcpStreamIf>& client) {
+      void TcpStream::create(std::shared_ptr<TcpStreamIf>& client, int const fd) {
             auto ref = std::make_shared<TcpStream>(fd, client);
             client->tcpStream = ref;
             ref->notifyWriteComplete = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncWriteComplete, ref.get()));
@@ -11,8 +11,8 @@ namespace Sb {
 Engine::setTimer(ref->connectTimer.get(), NanoSecs { 5'000'000 });
       }
 
-      void TcpStream::create(const int fd, std::shared_ptr<TcpStreamIf>& client, InetDest const& dest) {
-            auto ref = std::make_shared<TcpStream>(fd, client);
+      void TcpStream::create(std::shared_ptr<TcpStreamIf>& client, InetDest const& dest) {
+            auto ref = std::make_shared<TcpStream>(Socket::createTcpSocket(), client);
             client->tcpStream = ref;
             ref->notifyWriteComplete = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncWriteComplete, ref.get()));
             ref->connectTimer = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncConnectCheck, ref.get()));
@@ -125,7 +125,7 @@ if(!connected) {logError("Error  before connect " + std::to_string(fd));  pError
             std::lock_guard<std::mutex> sync(errorLock);
             if(!disconnected) {
                   disconnected = true;
-                  Engine::remove(this);
+                  Engine::remove(self);
             }
       }
 

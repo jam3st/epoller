@@ -4,7 +4,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include "socket.hpp"
-#include "endians.hpp"
 
 namespace Sb {
       typedef union {
@@ -20,23 +19,7 @@ namespace Sb {
       }
 
       Socket::~Socket() {
-           if(fd >= 0) {
-                  ::close(fd);
-            }
-      }
-
-      int Socket::getFd() const {
-            return fd;
-      }
-
-      int Socket::releaseFd() const {
-            int ret = fd;
-            fd = -1;
-            return ret;
-      }
-
-      bool Socket::fdReleased() const {
-            return fd == -1;
+            ::close(fd);
       }
 
       void Socket::makeNonBlocking(const int fd) {
@@ -48,7 +31,7 @@ namespace Sb {
 
       int Socket::createSocket(const Socket::SockType type) {
             int fd = ::socket(AF_INET6, type == UDP ? SOCK_DGRAM : SOCK_STREAM | SOCK_NONBLOCK, 0);
-
+            pErrorThrow(fd, fd);
             if(type == TCP) {
                   size_t one = 1;
                   setsockopt(fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));

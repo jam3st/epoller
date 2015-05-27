@@ -50,6 +50,6 @@ namespace Sb {
 
       void TcpListener::createStream(const int connFd) {
             auto client = clientFactory();
-            TcpStream::create(connFd, client);
+            TcpStream::create(client, connFd);
       }
 }

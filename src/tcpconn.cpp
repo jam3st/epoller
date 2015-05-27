@@ -2,16 +2,11 @@
 
 namespace Sb {
       namespace TcpConnection {
-            void create(const struct InetDest &dest, std::shared_ptr<TcpStreamIf> client) {
-                  auto ref = std::make_shared<TcpConn>(client, dest.port);
-                  ref->doConnect(ref, dest);
-            }
-
-            void create(const std::string &dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client) {
+             void create(const std::string &dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client) {
                   InetDest inetDest = Socket::destFromString(dest, port);
 
                   if(inetDest.valid) {
-                        create(inetDest, client);
+                        TcpStream::create(client, inetDest);
                   } else {
                         auto ref = std::make_shared<TcpConn>(client, port);
                         ref->self = ref;
@@ -21,8 +16,7 @@ namespace Sb {
             }
       }
 
-      TcpConn::TcpConn(std::shared_ptr<TcpStreamIf> client, uint16_t port) : Socket(Socket::createTcpSocket()), client(client), port(port),
-                                                                             self(nullptr), added(false) {
+      TcpConn::TcpConn(std::shared_ptr<TcpStreamIf> client, uint16_t port) : client(client), port(port) {
       }
 
       TcpConn::~TcpConn() {
@@ -33,45 +27,15 @@ namespace Sb {
             }
       }
 
-      void
-      TcpConn::handleRead() {
-      }
-
-      void TcpConn::handleWrite() {
-      }
-
       void TcpConn::doConnect(std::shared_ptr<TcpConn> &ref, InetDest const &dest) {
             std::lock_guard<std::mutex> sync(lock);
-            added = true;
             if(client) {
-                  auto const thisFd = releaseFd();
-                  TcpStream::create(thisFd, client, dest);
-                  added = false;
+                  TcpStream::create(client, dest);
                   client = nullptr;
             }
-
-            // After add because self == ref when called from resolver
             self = nullptr;
       }
 
-      void
-      TcpConn::handleError() {
-            logDebug("TcpConn::handleError " + std::to_string(fd));
-            std::lock_guard<std::mutex> sync(lock);
-            if(added) {
-                  added = false;
-                  Engine::remove(this);
-            }
-
-            if(client) {
-                  client->disconnected();
-                  client = nullptr;
-            }
-      }
-
-      bool TcpConn::waitingOutEvent() {
-            return true;
-      }
 
       void TcpConn::resolved(IpAddr const& addr) {
             InetDest dest { addr, true, port };
@@ -79,7 +43,11 @@ namespace Sb {
       }
 
       void TcpConn::notResolved() {
-            logDebug("TcpConn resolver error not connecting");
-            handleError();
+            logDebug("TcpConn::notResolved error not connecting");
+            std::lock_guard<std::mutex> sync(lock);
+            if(client) {
+                  client->disconnected();
+                  client = nullptr;
+            }
       }
 }

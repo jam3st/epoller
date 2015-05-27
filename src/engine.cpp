@@ -245,12 +245,13 @@ namespace Sb {
       void Engine::doAdd(const std::shared_ptr<Socket>& what) {
             std::lock_guard<std::mutex> sync(evHashLock);
             if(!stopping) {
+                  what->self = what;
                   eventHash.insert(std::make_pair(what.get(), what));
                   epoll_event event = { 0, { 0 }};
                   event.events = what.get()->waitingOutEvent() ? EPOLLOUT : 0;
                   event.events |= EPOLLONESHOT | EPOLLIN | EPOLLERR | EPOLLRDHUP | EPOLLET;
                   event.data.ptr = what.get();
-                  pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_ADD, what->getFd(), &event), epollFd);
+                  pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_ADD, what->fd, &event), epollFd);
             } else {
                   throw std::runtime_error("Cannot add when engine is stopping.");
             }
@@ -263,7 +264,7 @@ namespace Sb {
             theEngine->doAdd(what);
       }
 
-      void Engine::doRemove(Socket* const what) {
+      void Engine::doRemove(std::weak_ptr<Socket> const& what) {
             bool stoppingSync;
             {
                   std::lock_guard<std::mutex> sync(evHashLock);
@@ -275,16 +276,19 @@ namespace Sb {
                   decltype(eventHash)::const_iterator it;
                   {
                         std::lock_guard <std::mutex> sync(evHashLock);
-                        it = eventHash.find(what);
-                        assert(it != eventHash.end(), "Not found for removal");
-                        eventHash.erase(it);
-                        auto dummy = Event(it->second, []() { });
-                        eventQueue.removeAll(&dummy);
+                        auto ref = what.lock();
+                        if(ref) {
+                              it = eventHash.find(ref.get());
+                              assert(it != eventHash.end(), "Not found for removal");
+                              eventHash.erase(it);
+                              auto dummy = Event(it->second, []() { });
+                              eventQueue.removeAll(&dummy);
+                        }
                   }
             }
       }
 
-      void Engine::remove(Socket* const what) {
+      void Engine::remove(std::weak_ptr<Socket> const& what) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Engine::remove Please call Engine::Init() first");
             }
