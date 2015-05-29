@@ -18,7 +18,6 @@ namespace Sb {
                   virtual void handleRead();
                   virtual void handleWrite();
                   virtual bool waitingOutEvent();
-                  virtual bool highPriority();
 
             protected:
                   int const fd;

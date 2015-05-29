@@ -26,10 +26,6 @@ namespace Sb {
             return false;
       }
 
-      bool Socket::highPriority() {
-            return false;
-      }
-
       void Socket::handleRead() {
             assert(false, "Socket::handleRead()");
       }

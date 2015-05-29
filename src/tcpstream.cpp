@@ -57,6 +57,9 @@ namespace Sb {
             std::lock_guard<std::mutex> sync(writeLock);
             if(!connected) {
                   connected = true;
+                  if(notifyWriteComplete) {
+                        Engine::runAsync(notifyWriteComplete.get());
+                  }
                   if(connectTimer) {
                         Engine::cancelTimer(connectTimer.get());
                   }
@@ -64,40 +67,39 @@ namespace Sb {
                   if(!once) {
                         once = true;
                   }
-            }
-
-            writeTriggered = false;
-            blocked = false;
-            bool wasEmpty = (writeQueue.len() == 0);
-            for(;;) {
-                  auto const q = writeQueue.removeAndIsEmpty();
-                  auto const empty = q.second;
-                  if(empty) {
-                        break;
-                  } else {
-                        auto const data = q.first;
-                        auto const actuallySent = write(data);
-                        if((actuallySent - data.size()) == 0) {
-                              counters.notifyEgress(actuallySent);
-                              continue;
-                        } else if(actuallySent >= 0) {
-                              writeQueue.addFirst(Bytes(data.begin() + actuallySent, data.end()));
-                              counters.notifyEgress(actuallySent);
-                              continue;
-                        } else if(actuallySent == -1) {
-                              writeQueue.addFirst(data);
-                              blocked = true;
+                  writeTriggered = false;
+                  blocked = false;
+                  bool wasEmpty = (writeQueue.len() == 0);
+                  for(; ;) {
+                        auto const q = writeQueue.removeAndIsEmpty();
+                        auto const empty = q.second;
+                        if(empty) {
                               break;
                         } else {
-                              break;
+                              auto const data = q.first;
+                              auto const actuallySent = write(data);
+                              if((actuallySent - data.size()) == 0) {
+                                    counters.notifyEgress(actuallySent);
+                                    continue;
+                              } else if(actuallySent >= 0) {
+                                    writeQueue.addFirst(Bytes(data.begin() + actuallySent, data.end()));
+                                    counters.notifyEgress(actuallySent);
+                                    continue;
+                              } else if(actuallySent == -1) {
+                                    writeQueue.addFirst(data);
+                                    blocked = true;
+                                    break;
+                              } else {
+                                    break;
+                              }
                         }
                   }
-            }
-            bool isEmpty = (writeQueue.len() == 0);
-            if(!once || (!wasEmpty && isEmpty)) {
-                  once = true;
-                  if(notifyWriteComplete) {
-                        Engine::runAsync(notifyWriteComplete.get());
+                  bool isEmpty = (writeQueue.len() == 0);
+                  if(!once || (!wasEmpty && isEmpty)) {
+                        once = true;
+                        if(notifyWriteComplete) {
+                              Engine::runAsync(notifyWriteComplete.get());
+                        }
                   }
             }
       }

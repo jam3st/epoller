@@ -9,9 +9,10 @@ namespace Sb {
                   static void create(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory);
                   virtual ~TcpListener();
                   TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory);
+
             private:
                   virtual void handleRead() override;
-                  virtual bool highPriority() override;
+
             private:
                   void createStream(const int newFd);
                   std::function<std::shared_ptr<TcpStreamIf>()> clientFactory;

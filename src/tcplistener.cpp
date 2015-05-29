@@ -36,10 +36,6 @@ namespace Sb {
 
       }
 
-      bool TcpListener::highPriority() {
-            return true;
-      }
-
       void TcpListener::createStream(const int connFd) {
             auto client = clientFactory();
             TcpStream::create(client, connFd);

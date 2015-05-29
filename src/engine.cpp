@@ -121,6 +121,7 @@ namespace Sb {
       }
 
       void Engine::doTriggerWrites(Socket* const what) {
+            std::lock_guard <std::mutex> sync(evHashLock);
             auto ev = getSocket(what);
             auto const evts = EPOLLOUT;
             if(ev) {
@@ -138,6 +139,7 @@ namespace Sb {
       }
 
       void Engine::doRunAsync(Event* const event) {
+            std::lock_guard <std::mutex> sync(evHashLock);
             eventQueue.addLast(*event);
             sem.signal();
       }
@@ -253,14 +255,14 @@ namespace Sb {
                   decltype(eventHash)::const_iterator it;
                   {
                         std::lock_guard <std::mutex> sync(evHashLock);
-                        auto ref = what.lock();
+                        auto const ref = what.lock();
                         if(ref) {
                               it = eventHash.find(ref.get());
                               assert(it != eventHash.end(), "Not found for removal");
-                              eventHash.erase(it);
                               auto dummy = Event(it->second, []() { });
                               eventQueue.removeAll(&dummy);
                               timers.cancelAllTimers(ref.get());
+                              eventHash.erase(it);
                         }
                   }
             }
@@ -328,11 +330,14 @@ namespace Sb {
                   sync();
                   do {
                         sem.wait();
-                        evHashLock.lock();
-                        auto const q = eventQueue.removeAndIsEmpty();
-                        auto const empty = q.second;
-                        auto const event = q.first;
-                        evHashLock.unlock();
+                        Event event({}, []() {});
+                        bool empty = true;
+                        {
+                              std::lock_guard<std::mutex> sync(evHashLock);
+                              auto const q = eventQueue.removeAndIsEmpty();
+                              empty = q.second;
+                              event = q.first;
+                        }
 
                         if(!empty) {
                               activeCount++;
@@ -363,7 +368,6 @@ namespace Sb {
 
       std::shared_ptr<Runnable> Engine::getSocket(Socket const* const ev) {
             std::shared_ptr<Runnable> ret;
-            std::lock_guard<std::mutex> sync(evHashLock);
             auto it = eventHash.find(ev);
 
             if(it != eventHash.end()) {
@@ -385,15 +389,12 @@ namespace Sb {
                                     if(epEvents[i].data.ptr == nullptr) {
                                           handleTimerExpired();
                                     } else {
+                                          std::lock_guard <std::mutex> sync(evHashLock);
                                           auto sock = static_cast<Socket*>(epEvents[i].data.ptr);
                                           auto ev = getSocket(sock);
                                           auto const events = epEvents[i].events;
                                           if(ev) {
-                                                if(sock->highPriority()) {
-                                                      eventQueue.addFirst(Event(ev, std::bind(&Engine::run, this, sock, events)));
-                                                } else {
-                                                      eventQueue.addLast(Event(ev, std::bind(&Engine::run, this, sock, events)));
-                                                }
+                                                eventQueue.addLast(Event(ev, std::bind(&Engine::run, this, sock, events)));
                                                 sem.signal();
                                           }
                                     }

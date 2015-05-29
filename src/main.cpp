@@ -203,10 +203,7 @@ class Remote : public TcpStreamIf {
                         }
                         ref->queueWrite(x);
                   } else {
-                        logError("WHAT???");
-                        for(auto c : x) {
-                              initWrite.push_back(c);
-                        }
+                        logError("Write when deleted?");
                   }
             }
 
@@ -397,12 +394,12 @@ class NameServer : public UdpSocketIf {
 };
 
 int main(const int, const char*const argv[]) {
-	::close(0);
-  auto exitTimer = std::make_shared<ExitTimer>();
-	runUnit("timer", [&exitTimer]() {
-         exitTimer->setTimers();
-      });
-      exitTimer.reset();
+//	::close(0);
+//      auto exitTimer = std::make_shared<ExitTimer>();
+//	runUnit("timer", [&exitTimer]() {
+//         exitTimer->setTimers();
+//      });
+//      exitTimer.reset();
 //      runUnit("resolve",[] () {
 //           Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "asdasdasd", Resolver::AddrPref::AnyAddr);
 //      });
