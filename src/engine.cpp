@@ -95,6 +95,7 @@ namespace Sb {
 
       void Engine::doInit(int const minWorkersPerCpu) {
             assert(eventHash.size() > NUM_ENGINE_EVENTS || timerPending, "Engine::doInit Need to Add() something before Go().");
+            std::signal(SIGPIPE, signalHandler);
             for(int i = SIGHUP; i < _NSIG; ++i) {
                   std::signal(i, SIG_IGN);
             }
@@ -394,7 +395,7 @@ namespace Sb {
                                           auto ev = getSocket(sock);
                                           auto const events = epEvents[i].events;
                                           if(ev) {
-                                                eventQueue.addLast(Event(ev, std::bind(&Engine::run, this, sock, events)));
+                                                eventQueue.push_back(Event(ev, std::bind(&Engine::run, this, sock, events)));
                                                 sem.signal();
                                           }
                                     }

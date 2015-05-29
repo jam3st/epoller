@@ -18,6 +18,10 @@ namespace Sb {
                         queue.clear();
                   }
 
+                  void push_back(T src) {
+                        std::lock_guard<std::mutex> sync(lock);
+                        queue.push_back(src);
+                  }
                   void addLast(T src) {
                         std::lock_guard<std::mutex> sync(lock);
                         queue.push_back(src);

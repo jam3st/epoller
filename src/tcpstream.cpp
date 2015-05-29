@@ -26,13 +26,15 @@ namespace Sb {
                               client(client),
                               writeQueue({}),
                               blocked(true),
-                              connected(false) {
+                              connected(false),
+                              disconnecting(false) {
             Socket::makeNonBlocking(fd);
       }
 
       TcpStream::~TcpStream() {
+            std::lock_guard<std::mutex> syncWrite(writeLock);
+            std::lock_guard<std::mutex> syncRead(readLock);
             client->disconnected();
-            std::lock_guard<std::mutex> sync(writeLock);
             client = nullptr;
             Engine::cancelTimer(connectTimer.get());
             notifyWriteComplete.reset();
@@ -106,7 +108,7 @@ namespace Sb {
 
       bool TcpStream::waitingOutEvent()  {
             std::lock_guard<std::mutex> sync(writeLock);
-            return blocked || !once || !connected;
+            return (blocked || !once || !connected) && !disconnecting;
       }
 
       void TcpStream::asyncWriteComplete() {
@@ -129,9 +131,8 @@ namespace Sb {
       }
 
       void TcpStream::disconnect() {
-            std::lock_guard<std::mutex> sync(errorLock);
-            if(!disconnected) {
-                  disconnected = true;
+            if(!disconnecting) {
+                  disconnecting = true;
                   Engine::remove(self);
             }
       }

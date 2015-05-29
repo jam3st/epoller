@@ -44,12 +44,11 @@ namespace Sb {
                   std::shared_ptr<TcpStreamIf> client;
                   std::mutex writeLock;
                   std::mutex readLock;
-                  std::mutex errorLock;
                   SyncQueue<Bytes> writeQueue;
                   bool blocked = false;
                   bool once = false;
                   bool connected = false;
-                  bool disconnected = false;
+                  std::atomic_bool disconnecting;
                   bool writeTriggered = false;
                   std::unique_ptr<Event> notifyWriteComplete;
                   std::unique_ptr<Event> connectTimer;
