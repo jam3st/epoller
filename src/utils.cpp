@@ -7,7 +7,7 @@ namespace Sb {
       void assert(bool ok, const std::string error) {
             if(!ok) {
                   logError(std::string("Assertion failed: ") + error);
-                  throw std::runtime_error(error);
+                  __builtin_trap();
             }
       }
 
@@ -18,8 +18,7 @@ namespace Sb {
                         errorText += " " + std::to_string(fd);
                   }
                   logError(errorText);
-                  __builtin_trap();
-                  throw std::runtime_error(errorText);
+                  assert(false, errorText);
             }
       }
 

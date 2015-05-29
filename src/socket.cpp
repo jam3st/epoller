@@ -22,6 +22,26 @@ namespace Sb {
             ::close(fd);
       }
 
+      bool Socket::waitingOutEvent() {
+            return false;
+      }
+
+      bool Socket::highPriority() {
+            return false;
+      }
+
+      void Socket::handleRead() {
+            assert(false, "Socket::handleRead()");
+      }
+
+      void Socket::handleWrite() {
+            assert(false, "Socket::handleWrite()");
+      }
+
+      void Socket::handleError() {
+            assert(false, "Socket::handleError()");
+      }
+
       void Socket::makeNonBlocking(const int fd) {
             auto flags = ::fcntl(fd, F_GETFL, 0);
             pErrorThrow(flags, fd);

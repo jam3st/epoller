@@ -1,5 +1,5 @@
 ﻿#include <sys/epoll.h>
-#include <signal.h>
+#include <csignal>
 #include <unistd.h>
 #include <pthread.h>
 #include <algorithm>
@@ -14,15 +14,14 @@ namespace Sb {
       }
 
       Engine::Engine() : eventQueue(Event({}, []() {})),
-            stopping(false),
             timerPending(false),
+            stopping(false),
             activeCount(0),
             epollTid(std::this_thread::get_id()),
             epollThreadHandle(::pthread_self()),
-            epollFd(::epoll_create(23423)),
+            epollFd(::epoll_create1(EPOLL_CLOEXEC)),
             timerFd(::timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK)),
             timers(Engine::setTrigger) {
-            blockSignals();
             Logger::start();
             Logger::setMask(Logger::LogType::EVERYTHING);
             assert(epollFd >= 0, "Failed to create epollFd");
@@ -37,7 +36,7 @@ namespace Sb {
             ::signal(SIGUSR1, SIG_DFL);
             ::close(timerFd);
             ::close(epollFd);
-            logDebug("Engine destroyed. To restart call Init() then Go().");
+            logDebug("Engine::~Engine()");
             Logger::stop();
       }
 
@@ -53,40 +52,15 @@ namespace Sb {
             }
       }
 
-      void Engine::signalHandler(int) {
+      void signalHandler(int) {
             Engine::theEngine->doSignalHandler();
       }
 
-      void Engine::blockSignals() {
-            sigset_t sigMask;
-            ::sigfillset(&sigMask);
-            pErrorThrow(::sigprocmask(SIG_SETMASK, &sigMask, nullptr));
-      }
-
       void Engine::doSignalHandler() {
-            if(epollTid == std::this_thread::get_id()) {
+            if(!stopping && epollTid == std::this_thread::get_id()) {
                   std::lock_guard<std::mutex> sync(evHashLock);
                   stopping = true;
             }
-      }
-
-      void Engine::initSignals() {
-            struct sigaction sigAction;
-            sigAction.sa_handler = Engine::signalHandler;
-            sigAction.sa_flags = SA_RESTART;
-            sigAction.sa_restorer = nullptr;
-            ::sigemptyset(&sigAction.sa_mask);
-            pErrorThrow(::sigaction(SIGQUIT, &sigAction, nullptr));
-            pErrorThrow(::sigaction(SIGINT, &sigAction, nullptr));
-            pErrorThrow(::sigaction(SIGTERM, &sigAction, nullptr));
-            pErrorThrow(::sigaction(SIGUSR1, &sigAction, nullptr));
-            sigset_t sigMask;
-            ::sigfillset(&sigMask);
-            ::sigdelset(&sigMask, SIGQUIT);
-            ::sigdelset(&sigMask, SIGINT);
-            ::sigdelset(&sigMask, SIGTERM);
-            ::sigdelset(&sigMask, SIGUSR1);
-            pErrorThrow(::sigprocmask(SIG_SETMASK, &sigMask, nullptr));
       }
 
       void Engine::startWorkers(int minWorkersPerCpu) {
@@ -121,12 +95,20 @@ namespace Sb {
 
       void Engine::doInit(int const minWorkersPerCpu) {
             assert(eventHash.size() > NUM_ENGINE_EVENTS || timerPending, "Engine::doInit Need to Add() something before Go().");
-            initSignals();
+            for(int i = SIGHUP; i < _NSIG; ++i) {
+                  std::signal(i, SIG_IGN);
+            }
+            std::signal(SIGQUIT, signalHandler);
+            std::signal(SIGINT, signalHandler);
+            std::signal(SIGTERM, signalHandler);
+            std::signal(SIGUSR1, signalHandler);
             startWorkers(minWorkersPerCpu);
             doEpoll();
-            blockSignals();
             theResolver.destroy();
             stopWorkers();
+            for(int i = SIGHUP; i < _NSIG; ++i) {
+                  std::signal(i, SIG_DFL);
+            }
             eventQueue.clear();
             eventHash.clear();
       }
@@ -169,6 +151,7 @@ namespace Sb {
       }
 
       NanoSecs Engine::doSetTimer(Event* const timer, NanoSecs const& timeout) {
+            std::lock_guard<std::mutex> sync(evHashLock);
             return timers.setTimer(timer->owner(), timer, timeout);
       }
 
@@ -181,20 +164,28 @@ namespace Sb {
       }
 
       NanoSecs Engine::doCancelTimer(Event * const timer) {
-            auto ret = timers.cancelTimer(timer->owner(), timer);
-            return ret;
+            std::lock_guard<std::mutex> sync(evHashLock);
+            return timers.cancelTimer(timer->owner(), timer);
       }
 
       void Engine::handleTimerExpired() {
-            {
-                  std::lock_guard<std::mutex> sync(evHashLock);
-                  assert(timerPending, "Engine::onTimerExpired called without timer set");
+            std::lock_guard<std::mutex> sync(evHashLock);
+            if(timerPending) {
                   timerPending = false;
-            }
+                  clearTimer();
 
+                  auto ev = timers.handleTimerExpired();
+                  if(ev != nullptr) {
+                        eventQueue.addLast(*ev);
+                        sem.signal();
+                  }
+            }
+      }
+
+      void Engine::clearTimer() const {
             for(;;) {
                   uint64_t value;
-                  auto numRead = ::read(timerFd, &value, sizeof(value));
+                  auto numRead = read(timerFd, &value, sizeof(value));
                   if(numRead == -1) {
                         if(errno == EINTR) {
                               continue;
@@ -204,11 +195,6 @@ namespace Sb {
                               pErrorThrow(numRead, timerFd);
                         }
                   }
-            }
-            auto ev = timers.handleTimerExpired();
-            if(ev != nullptr) {
-                  eventQueue.addLast(*ev);
-                  sem.signal();
             }
       }
 
@@ -221,25 +207,23 @@ namespace Sb {
       }
 
       void Engine::doSetTrigger(NanoSecs const& timeout) {
-            std::lock_guard<std::mutex> sync(evHashLock);
             if(timeout == NanoSecs{0}) {
                   timerPending = false;
-                  return;
+                  clearTimer();
             } else {
                   timerPending = true;
+                  epoll_event event = { 0, { 0 }};
+                  event.events = EPOLLIN | EPOLLONESHOT | EPOLLET;
+                  event.data.ptr = nullptr;
+                  pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_MOD, timerFd, &event), epollFd);
+                  itimerspec new_timer;
+                  new_timer.it_interval.tv_sec = 0;
+                  new_timer.it_interval.tv_nsec = 0;
+                  new_timer.it_value.tv_sec = timeout.count() / NanoSecsInSecs;
+                  new_timer.it_value.tv_nsec = timeout.count() % NanoSecsInSecs;
+                  itimerspec old_timer;
+                  pErrorThrow(::timerfd_settime(timerFd, 0, &new_timer, &old_timer), timerFd);
             }
-
-            epoll_event event = { 0, { 0 }};
-            event.events = EPOLLIN | EPOLLONESHOT | EPOLLET;
-            event.data.ptr = nullptr;
-            pErrorThrow(::epoll_ctl(epollFd, EPOLL_CTL_MOD, timerFd, &event), epollFd);
-            itimerspec new_timer;
-            new_timer.it_interval.tv_sec = 0;
-            new_timer.it_interval.tv_nsec = 0;
-            new_timer.it_value.tv_sec = timeout.count() / NanoSecsInSecs;
-            new_timer.it_value.tv_nsec = timeout.count() % NanoSecsInSecs;
-            itimerspec old_timer;
-            pErrorThrow(::timerfd_settime(timerFd, 0, &new_timer, &old_timer), timerFd);
       }
 
       void Engine::doAdd(const std::shared_ptr<Socket>& what) {
@@ -265,14 +249,7 @@ namespace Sb {
       }
 
       void Engine::doRemove(std::weak_ptr<Socket> const& what) {
-            bool stoppingSync;
-            {
-                  std::lock_guard<std::mutex> sync(evHashLock);
-                  stoppingSync = stopping;
-            };
-
-
-            if(!stoppingSync) {
+            if(!stopping) {
                   decltype(eventHash)::const_iterator it;
                   {
                         std::lock_guard <std::mutex> sync(evHashLock);
@@ -283,6 +260,7 @@ namespace Sb {
                               eventHash.erase(it);
                               auto dummy = Event(it->second, []() { });
                               eventQueue.removeAll(&dummy);
+                              timers.cancelAllTimers(ref.get());
                         }
                   }
             }
@@ -312,7 +290,7 @@ namespace Sb {
       }
 
       void Engine::doStop() {
-            if(epollTid != std::this_thread::get_id()) {
+            if(!stopping && epollTid != std::this_thread::get_id()) {
                   ::pthread_kill(epollThreadHandle, SIGUSR1);
             }
       }
@@ -347,7 +325,6 @@ namespace Sb {
 
       void Engine::worker(Worker& me) {
             try {
-                  bool stoppingSync = stopping;
                   sync();
                   do {
                         sem.wait();
@@ -368,9 +345,8 @@ namespace Sb {
                                     doStop();
                                     break;
                               }
-                              stoppingSync = stopping;
                         }
-                  } while(!stoppingSync);
+                  } while(!stopping);
             } catch(std::exception& e) {
                   logError(std::string("Engine::worker threw a ") + e.what());
                   Engine::theEngine->stop();
@@ -398,16 +374,12 @@ namespace Sb {
 
       void Engine::doEpoll() {
             try {
-                  for(;;) {
-                        {
-                              std::lock_guard<std::mutex> sync(evHashLock);
-                              if(stopping) {
-                                    break;
-                              }
-                        }
+                  while(!stopping) {
                         epoll_event epEvents[EPOLL_EVENTS_PER_RUN];
                         int num = epoll_wait(epollFd, epEvents, EPOLL_EVENTS_PER_RUN, -1);
-
+                        if(stopping) {
+                              break;
+                        }
                         if(num >= 0) {
                               for(int i = 0; i < num; ++i) {
                                     if(epEvents[i].data.ptr == nullptr) {
@@ -417,7 +389,11 @@ namespace Sb {
                                           auto ev = getSocket(sock);
                                           auto const events = epEvents[i].events;
                                           if(ev) {
-                                                eventQueue.addLast(Event(ev, std::bind(&Engine::run, this, sock, events)));
+                                                if(sock->highPriority()) {
+                                                      eventQueue.addFirst(Event(ev, std::bind(&Engine::run, this, sock, events)));
+                                                } else {
+                                                      eventQueue.addLast(Event(ev, std::bind(&Engine::run, this, sock, events)));
+                                                }
                                                 sem.signal();
                                           }
                                     }

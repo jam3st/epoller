@@ -13,13 +13,6 @@ namespace Sb{
 
       Counters::~Counters() {
             std::lock_guard<std::mutex> sync(lock);
-            auto end = SteadyClock::now();
-            auto elapsedNs = elapsed(start, end).count();
-            if(egress <= 675 || ingress <= 675 || elapsedNs > 30'000'000'000 ) {
-                  dumpStats();
-            }
-
-
       }
 
       void Counters::dumpStats() const {
@@ -28,11 +21,6 @@ namespace Sb{
             if(elapsedNs <= 0) {
                   elapsedNs = 1;
             }
-//            double elapsed = static_cast<double>(elapsedNs);
-//            double ingressMb = static_cast<double>(ingress) / 1024.0 / 1024.0;
-//            double egressMb = static_cast<double>(egress) / 1024.0 / 1024.0;
-//            double ingessRate = ingressMb / elapsed / 1.0e9;
-//            double egressRate = egressMb / elapsed / 1.0e9;
              logDebug("Elapsed: " + std::to_string(elapsedNs) + " IN " + std::to_string(ingress) +  " OUT " +  std::to_string(egress));
       };
 

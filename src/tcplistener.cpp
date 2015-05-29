@@ -36,16 +36,8 @@ namespace Sb {
 
       }
 
-      bool TcpListener::waitingOutEvent() {
-            return false;
-      }
-
-      void TcpListener::handleWrite() {
-            throw std::runtime_error("TcpListener::handleWrite() not allowed " + std::to_string(fd));
-      }
-
-      void TcpListener::handleError() {
-            throw std::runtime_error("TcpListener::handleError() " + std::to_string(fd));
+      bool TcpListener::highPriority() {
+            return true;
       }
 
       void TcpListener::createStream(const int connFd) {

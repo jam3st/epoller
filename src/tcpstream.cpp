@@ -7,8 +7,8 @@ namespace Sb {
             client->tcpStream = ref;
             ref->notifyWriteComplete = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncWriteComplete, ref.get()));
             ref->connectTimer = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncConnectCheck, ref.get()));
+            ref->connected = true;
             Engine::add(ref);
-Engine::setTimer(ref->connectTimer.get(), NanoSecs { 5'000'000 });
       }
 
       void TcpStream::create(std::shared_ptr<TcpStreamIf>& client, InetDest const& dest) {
@@ -18,8 +18,7 @@ Engine::setTimer(ref->connectTimer.get(), NanoSecs { 5'000'000 });
             ref->connectTimer = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncConnectCheck, ref.get()));
             Engine::add(ref);
             ref->connect(dest);
-Engine::setTimer(ref->connectTimer.get(), NanoSecs { 5'000'000 });
-
+            Engine::setTimer(ref->connectTimer.get(), NanoSecs { 10'000'000'000 });
       }
 
       TcpStream::TcpStream(const int fd, std::shared_ptr<TcpStreamIf>& client) :
@@ -58,7 +57,15 @@ Engine::setTimer(ref->connectTimer.get(), NanoSecs { 5'000'000 });
             std::lock_guard<std::mutex> sync(writeLock);
             if(!connected) {
                   connected = true;
+                  if(connectTimer) {
+                        Engine::cancelTimer(connectTimer.get());
+                  }
+            } else {
+                  if(!once) {
+                        once = true;
+                  }
             }
+
             writeTriggered = false;
             blocked = false;
             bool wasEmpty = (writeQueue.len() == 0);
@@ -97,7 +104,7 @@ Engine::setTimer(ref->connectTimer.get(), NanoSecs { 5'000'000 });
 
       bool TcpStream::waitingOutEvent()  {
             std::lock_guard<std::mutex> sync(writeLock);
-            return blocked || !connected;
+            return blocked || !once || !connected;
       }
 
       void TcpStream::asyncWriteComplete() {
@@ -108,16 +115,14 @@ Engine::setTimer(ref->connectTimer.get(), NanoSecs { 5'000'000 });
 
       void TcpStream::asyncConnectCheck() {
             std::lock_guard<std::mutex> sync(writeLock);
-            if(connectTimer && writeQueue.len() != 0 && !writeTriggered && !blocked) {
-logDebug("TcpStream::asyncConnectCheck " + std::to_string(writeQueue.len()) + " " + std::to_string(once) + " " + std::to_string(blocked) + " " + std::to_string(writeTriggered) + " " + std::to_string(fd));
-Engine::setTimer(connectTimer.get(), NanoSecs { 5'000'000 });
+            if(!connected) {
+                  logError("Timeout in connection");
+                  disconnect();
             }
       }
 
 
       void TcpStream::handleError() {
-if(!connected) {logError("Error  before connect " + std::to_string(fd));  pErrorLog(-1, fd); __builtin_trap();}
-
             disconnect();
       }
 

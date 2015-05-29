@@ -14,10 +14,12 @@ namespace Sb {
       private:
                   friend class Engine;
 
-                  virtual void handleError() = 0;
-                  virtual void handleRead() = 0;
-                  virtual void handleWrite() = 0;
-                  virtual bool waitingOutEvent() = 0;
+                  virtual void handleError();
+                  virtual void handleRead();
+                  virtual void handleWrite();
+                  virtual bool waitingOutEvent();
+                  virtual bool highPriority();
+
             protected:
                   int const fd;
                   std::weak_ptr<Socket> self;

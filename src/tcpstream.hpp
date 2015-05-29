@@ -13,7 +13,7 @@ namespace Sb {
             public:
                   friend class TcpStream;
                   virtual void disconnect() = 0;
-                  virtual void received(const Bytes&) = 0;
+                  virtual void received(Bytes const&) = 0;
                   virtual void writeComplete() = 0;
                   virtual void disconnected() = 0;
             protected:
@@ -46,11 +46,11 @@ namespace Sb {
                   std::mutex readLock;
                   std::mutex errorLock;
                   SyncQueue<Bytes> writeQueue;
-                  bool blocked = true;
+                  bool blocked = false;
+                  bool once = false;
                   bool connected = false;
                   bool disconnected = false;
                   bool writeTriggered = false;
-                  bool once = false;
                   std::unique_ptr<Event> notifyWriteComplete;
                   std::unique_ptr<Event> connectTimer;
                   Counters counters;

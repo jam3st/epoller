@@ -31,8 +31,8 @@ namespace Sb {
                   void stopWorkers();
 
             private:
+                  friend void signalHandler(int);
                   static void setTrigger(NanoSecs const& when);
-                  static void blockSignals();
 
                   class Worker {
                         public:
@@ -48,8 +48,6 @@ namespace Sb {
                   Engine();
                   void doEpoll(Worker* me) noexcept;
                   static void doWork(Worker* me) noexcept;
-                  static void signalHandler(int);
-                  static void initSignals();
 
                   void doStop();
                   void doSignalHandler();
@@ -66,13 +64,14 @@ namespace Sb {
                   void doRemove(std::weak_ptr<Socket> const& what);
                   void doTriggerWrites(Socket* const what);
                   void doRunAsync(Event* const event);
+                  void clearTimer() const;
 
             private:
                   static Engine* theEngine;
                   Semaphore sem;
                   SyncQueue<Event> eventQueue;
-                  bool stopping;
                   bool timerPending;
+                  bool stopping;
                   std::atomic_int activeCount;
                   std::thread::id epollTid;
                   std::thread::native_handle_type epollThreadHandle;
