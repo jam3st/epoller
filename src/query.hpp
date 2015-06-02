@@ -25,18 +25,16 @@ namespace Sb {
                   Tlsa = 52,
                   Any = 255
             };
-
             struct Qanswer {
-                  public:
-                        bool valid;
-                        std::uint16_t reqNo;
-                        std::string name;
-                        std::vector<IpAddr> addr;
-                        NanoSecs ttl;
-                        TimePointNs timeStamp;
+            public:
+                  bool valid;
+                  std::uint16_t reqNo;
+                  std::string name;
+                  std::vector<IpAddr> addr;
+                  NanoSecs ttl;
+                  TimePointNs timeStamp;
             };
-
-            std::vector<uint8_t> resolve(uint16_t reqNo, const std::string& name, Qtype qType);
-            Qanswer decode(Bytes const& data);
+            std::vector<uint8_t> resolve(uint16_t reqNo, const std::string&name, Qtype qType);
+            Qanswer decode(Bytes const&data);
       };
 }

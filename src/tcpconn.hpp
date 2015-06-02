@@ -9,24 +9,23 @@
 namespace Sb {
       class TcpConn;
       namespace TcpConnection {
-            void create(const struct InetDest& dest, std::shared_ptr<TcpStreamIf> client);
-            void create(const std::string& dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client);
+            void create(const struct InetDest&dest, std::shared_ptr<TcpStreamIf> client);
+            void create(const std::string&dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client);
       }
-
       class TcpConn final : public ResolverIf {
-            public:
-                  friend void TcpConnection::create(const std::string& dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client);
-                  friend void TcpConnection::create(const InetDest& dest, std::shared_ptr<TcpStreamIf> client);
-                  TcpConn(std::shared_ptr<TcpStreamIf> client, uint16_t port);
-                  virtual ~TcpConn();
-                  virtual void resolved(IpAddr const& addr) override;
-                  virtual void notResolved() override;
-            private:
-                  virtual void doConnect(std::shared_ptr<TcpConn> &ref, InetDest const &dest);
-            private:
-                  std::shared_ptr<TcpStreamIf> client;
-                  uint16_t port;
-                  std::shared_ptr<TcpConn> self;
-                  std::mutex lock;
+      public:
+            friend void TcpConnection::create(const std::string&dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client);
+            friend void TcpConnection::create(const InetDest&dest, std::shared_ptr<TcpStreamIf> client);
+            TcpConn(std::shared_ptr<TcpStreamIf> client, uint16_t port);
+            virtual ~TcpConn();
+            virtual void resolved(IpAddr const&addr) override;
+            virtual void notResolved() override;
+      private:
+            virtual void doConnect(std::shared_ptr<TcpConn>&ref, InetDest const&dest);
+      private:
+            std::shared_ptr<TcpStreamIf> client;
+            uint16_t port;
+            std::shared_ptr<TcpConn> self;
+            std::mutex lock;
       };
 }

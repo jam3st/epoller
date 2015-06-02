@@ -1,5 +1,4 @@
 ﻿#include <string>
-
 #include "logger.hpp"
 #include "tcplistener.hpp"
 
@@ -9,9 +8,10 @@ namespace Sb {
             Engine::add(std::make_shared<TcpListener>(port, clientFactory));
       }
 
-      TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) : Socket(Socket::createTcpSocket()),
-            clientFactory(clientFactory) {
+      TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) : Socket(TCP),
+                                                                                                                   clientFactory(clientFactory) {
             reuseAddress();
+            makeTransparent();
             bind(port);
             listen();
       }
@@ -20,20 +20,18 @@ namespace Sb {
       }
 
       void TcpListener::handleRead() {
-            for(;;) {
+            for (; ;) {
                   int connFd = -1;
                   {
                         std::lock_guard<std::mutex> sync(lock);
                         connFd = accept();
                   }
-
-                  if(connFd >= 0) {
+                  if (connFd >= 0) {
                         createStream(connFd);
                   } else {
                         break;
                   }
             }
-
       }
 
       void TcpListener::createStream(const int connFd) {

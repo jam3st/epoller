@@ -5,7 +5,7 @@ CLANG_CXXFLAGS         = -pipe -std=c++14 -pthread -fdiagnostics-color -flto -Wa
 GCC_COV_CXXFLAGS       = -pipe -std=c++14 -pthread -fdiagnostics-color -flto -Wall -Werror -O0 -g3 -gdwarf-4 -fno-eliminate-unused-debug-types -fprofile-arcs --coverage
 GCC_LFLAGS             = $(GCC_CXXFLAGS) -ltcmalloc -s
 CLANG_LFLAGS           = $(CLANG_CXXFLAGS) -ltcmalloc -s
-GCC_COV_LFLAGS         = $(GCC_COV_CXXFLAGS) -ltcmalloc -lgcov
+GCC_COV_LFLAGS         = $(GCC_COV_CXXFLAGS) -ltcmalloc -lprofiler -lgcov
 
 BUILD_DIR              = ../build
 
@@ -18,7 +18,7 @@ RESULTS_DIR            = $(BUILD_DIR)/results
 INCPATH                = -I../src
 SB_SRC_DIR             = ../src
 SB_SRCS = \
-clock.cpp counters.cpp enc_ocb.cpp engine.cpp event.cpp logger.cpp main.cpp query.cpp resolver.cpp resolverimpl.cpp resouces.cpp semaphore.cpp socket.cpp tcpconn.cpp tcplistener.cpp tcpstream.cpp timers.cpp tlsclientwrapper.cpp tlscredentials.cpp tlstcpstream.cpp udpsocket.cpp utils.cpp
+clock.cpp counters.cpp enc_ocb.cpp engine.cpp event.cpp logger.cpp main.cpp query.cpp resolver.cpp resolverimpl.cpp semaphore.cpp socket.cpp tcpconn.cpp tcplistener.cpp tcpstream.cpp timers.cpp tlsclientwrapper.cpp tlscredentials.cpp tlstcpstream.cpp udpsocket.cpp utils.cpp
 
 PRODUCT                = sblade
 GCC_OBJS               = ${SB_SRCS:%.cpp=$(GCC_OBJS_DIR)/%.o}
@@ -36,7 +36,7 @@ coverage: $(RESULTS_DIR)/index.html
 
 $(RESULTS_DIR)/index.html: $(TARGET_COV) | $(RESULTS_DIR)
 	-rm -rf "$(RESULTS_DIR)/*"
-	-"$(TARGET_COV)"
+	env HEAPCHECK=normal "$(TARGET_COV)" || true
 	lcov --external --base-directory .. --list-full-path --capture --derive-func-data --rc lcov_branch_coverage=1 --directory="$(COV_OBJS_DIR)" --output-file="$(RESULTS_DIR)/info.lcov"
 	lcov --list "$(RESULTS_DIR)/info.lcov"
 	lcov --remove "$(RESULTS_DIR)/info.lcov" "*g++*" -o "$(RESULTS_DIR)/info.lcov.filtered"

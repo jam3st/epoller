@@ -8,84 +8,81 @@
 #include "event.hpp"
 #include "timers.hpp"
 #include "socket.hpp"
-#include "syncqueue.hpp"
-#include "event.hpp"
 #include "resolver.hpp"
 
 namespace Sb {
       class Engine final {
-            public:
-                  static void start(int minWorkersPerCpu = 4);
-                  static void stop();
-                  static void init();
-                  static void add(std::shared_ptr<Socket> const& what);
-                  static void remove(std::weak_ptr<Socket> const& what);
-                  static void triggerWrites(Socket* const what);
-                  static void runAsync(Event* const event);
-                  static Resolver& resolver();
-                  static NanoSecs setTimer(Event* const timer, NanoSecs const& timeout);
-                  static NanoSecs cancelTimer(Event* const timer);
-                  ~Engine();
-                  void sync();
-                  void startWorkers(int const minWorkersPerCpu);
-                  void stopWorkers();
+      public:
+            static void start(int minWorkersPerCpu = 4);
+            static void stop();
+            static void init();
+            static void add(std::shared_ptr<Socket> what);
+            static void remove(std::weak_ptr<Socket>& what);
+            static void triggerWrites(Socket* const what);
+            static void runAsync(Event* const event);
+            static Resolver&resolver();
+            static NanoSecs setTimer(Event* const timer, NanoSecs const&timeout);
+            static NanoSecs cancelTimer(Event* const timer);
+            ~Engine();
+            void startWorkers(int const minWorkersPerCpu);
+            void stopWorkers();
+      private:
+            class Worker;
 
-            private:
-                  friend void signalHandler(int);
-                  static void setTrigger(NanoSecs const& when);
+            Engine();
+            friend void signalHandler(int);
+            void doEpoll(Worker* me) noexcept;
+            static void doWork(Worker* me) noexcept;
+            void doStop();
+            void doSignalHandler();
+            void handleTimerExpired();
+            NanoSecs doSetTimer(Event* const timer, NanoSecs const& timeout);
+            NanoSecs doCancelTimer(Event* const timer);
+            void setTimerTrigger(Event const* const what, NanoSecs const& when);
+            void doInit(int const minWorkersPerCpu);
+            std::shared_ptr<Socket> getSocket(int const fd);
+            void run(Socket* const sock, const uint32_t events);
+            void doEpoll();
+            void worker(Worker&me);
+            void doAdd(std::shared_ptr<Socket> what);
+            void doRemove(std::weak_ptr<Socket>& what);
+            void doTriggerWrites(Socket* const what);
+            void doRunAsync(Event* const event);
+            void clearTimer() const;
 
-                  class Worker {
-                        public:
-                              Worker() = delete;
-                              Worker(void (func(Worker*) noexcept)) : thread(func, this) {
-                              }
-                              ~Worker();
-                              std::thread thread;
-                              std::atomic_bool exited;
-                  };
+      private:
+            static Engine* theEngine;
+            std::mutex timerLock;
+            Semaphore sem;
+            std::mutex eqLock;
+            std::deque<Event> eventQueue;
+            std::unique_ptr<Event> timerEvent;
+            bool stopping;
+            std::atomic_int activeCount;
+            std::thread::id epollTid;
+            std::thread::native_handle_type epollThreadHandle;
+            int epollFd = -1;
+            int timerFd = -1;
+            std::vector<Worker*> slaves;
+            std::mutex evHashLock;
+            std::unordered_map<int, std::shared_ptr<Socket>> eventHash;
+            Resolver theResolver;
+            Timers timers;
+      private:
+            std::size_t const NUM_ENGINE_EVENTS = 0;
+            std::size_t const EPOLL_EVENTS_PER_RUN = 128;
+            NanoSecs const THREAD_TERMINATE_WAIT_TIME = NanoSecs{ONE_MS_IN_NS};
+      };
 
-            private:
-                  Engine();
-                  void doEpoll(Worker* me) noexcept;
-                  static void doWork(Worker* me) noexcept;
+      class Engine::Worker {
+      public:
+            Worker() = delete;
 
-                  void doStop();
-                  void doSignalHandler();
-                  void handleTimerExpired();
-                  NanoSecs doSetTimer(Event* const timer, NanoSecs const& timeout);
-                  NanoSecs doCancelTimer(Event* const timer);
-                  void doSetTrigger(NanoSecs const& timeout);
-                  void doInit(int const minWorkersPerCpu);
-                  std::shared_ptr<Runnable> getSocket(Socket const* const ev);
-                  void run(Socket* const sock, const uint32_t events) const;
-                  void doEpoll();
-                  void worker(Worker& me);
-                  void doAdd(std::shared_ptr<Socket> const& what);
-                  void doRemove(std::weak_ptr<Socket> const& what);
-                  void doTriggerWrites(Socket* const what);
-                  void doRunAsync(Event* const event);
-                  void clearTimer() const;
+            Worker(void (func(Worker*) noexcept)) : thread(func, this) {
+            }
 
-            private:
-                  static Engine* theEngine;
-                  Semaphore sem;
-                  SyncQueue<Event> eventQueue;
-                  bool timerPending;
-                  bool stopping;
-                  std::atomic_int activeCount;
-                  std::thread::id epollTid;
-                  std::thread::native_handle_type epollThreadHandle;
-                  int epollFd = -1;
-                  int timerFd = -1;
-                  std::vector<Worker*> slaves;
-                  std::unordered_map<Socket const*, std::shared_ptr<Socket> const> eventHash;
-                  std::mutex evHashLock;
-                  Resolver theResolver;
-                  Timers timers;
-
-            private:
-                  std::size_t const NUM_ENGINE_EVENTS = 0;
-                  std::size_t const EPOLL_EVENTS_PER_RUN = 128;
-                  NanoSecs const THREAD_TERMINATE_WAIT_TIME = NanoSecs{500'000};
+            ~Worker();
+            std::thread thread;
+            std::atomic_bool exited;
       };
 }
