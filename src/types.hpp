@@ -8,6 +8,7 @@
 
 #include <iostream>
 namespace Sb {
+      typedef uint64_t bitsPerSecond;
       typedef uint8_t byte;
       typedef std::vector<byte> Bytes;
       constexpr ssize_t MAX_PACKET_SIZE = 4096;
@@ -16,8 +17,13 @@ namespace Sb {
       constexpr size_t ADDR_LEN_SIZE_T = IP_ADDRESS_BIT_LEN / sizeof(uint16_t) / NUM_BITS_PER_SIZE_T;
 
       struct IpAddr {
-            const size_t IP4_PREFIX_LEN_SIZE_T = IP_ADDRESS_BIT_LEN / sizeof(uint16_t) / NUM_BITS_PER_SIZE_T - sizeof(uint32_t) / sizeof(uint16_t);
-            const std::array<uint16_t, ADDR_LEN_SIZE_T> ip4Prefix { { 0, 0, 0, 0, 0, 0xffff, 0, 0 } };
+            size_t const IP4_PREFIX_LEN_SIZE_T = IP_ADDRESS_BIT_LEN / sizeof(uint16_t) / NUM_BITS_PER_SIZE_T - sizeof(uint32_t) / sizeof(uint16_t);
+            std::array<uint16_t, ADDR_LEN_SIZE_T> const ip4Prefix { { 0, 0, 0, 0, 0, 0xffff, 0, 0 } };
+
+            IpAddr& operator=(IpAddr const& rhs) {
+                  d = rhs.d;
+                  return *this;
+            }
 
             void setIpV4(Bytes const& src) {
                   d = ip4Prefix;
@@ -25,7 +31,15 @@ namespace Sb {
                   d[IP4_PREFIX_LEN_SIZE_T + 1] = networkEndian(src[3], src[2]);
             }
 
-            void set(std::array<uint8_t, IP_ADDRESS_BIT_LEN / NUM_BITS_PER_SIZE_T> const &netOrder) {
+            void setIpV4(uint32_t const addr) {
+                  union {uint32_t d32; uint16_t s[sizeof(uint32_t)/sizeof(uint16_t)]; } a { addr};
+                  d = ip4Prefix;
+                  d[IP4_PREFIX_LEN_SIZE_T] = a.s[0];
+                  d[IP4_PREFIX_LEN_SIZE_T + 1] = a.s[1];
+
+            };
+
+            void set(std::array<uint8_t, IP_ADDRESS_BIT_LEN / NUM_BITS_PER_SIZE_T> const& netOrder) {
                   for (size_t i = 0; i < sizeof(d) / sizeof(d[0]); ++i) {
                         d[i] = networkEndian(netOrder[i * 2 + 1], netOrder[i * 2]);
                   }
@@ -67,8 +81,16 @@ namespace Sb {
             std::string toString() const {
                   return addr.toString() + "=>" + std::to_string(port);
             }
+            InetDest& operator=(InetDest const& rhs) {
+                  addr = rhs.addr;
+                  valid = rhs.valid;
+                  port = rhs.port;
+                  ifIndex = rhs.ifIndex;
+                  return *this;
+            }
             IpAddr addr;
             bool valid;
             uint16_t port;
+            unsigned int ifIndex;
       };
 }

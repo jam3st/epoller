@@ -13,6 +13,7 @@ namespace Sb {
             reuseAddress();
             makeTransparent();
             bind(port);
+            makeNonBlocking();
             listen();
       }
 

@@ -56,10 +56,7 @@ namespace Sb {
             }
 
             inline void networkEndian(uint16_t const d, std::vector<uint8_t>& stream) {
-                  const U16Swap tmp {
-                        d
-                  };
-
+                  const U16Swap tmp{d};
                   if(bigEndian) {
                         stream.push_back(tmp.b[1]);
                         stream.push_back(tmp.b[0]);
@@ -68,6 +65,22 @@ namespace Sb {
                         stream.push_back(tmp.b[1]);
                   }
             }
+
+            inline void networkEndian(uint32_t const d, std::vector<uint8_t>& stream) {
+                  const U32Swap tmp{d};
+                  if (bigEndian) {
+                        stream.push_back(tmp.b[3]);
+                        stream.push_back(tmp.b[2]);
+                        stream.push_back(tmp.b[1]);
+                        stream.push_back(tmp.b[0]);
+                  } else {
+                        stream.push_back(tmp.b[0]);
+                        stream.push_back(tmp.b[1]);
+                        stream.push_back(tmp.b[2]);
+                        stream.push_back(tmp.b[3]);
+                  }
+            }
+
 
             inline uint32_t networkEndian(const uint8_t d0, const uint8_t d1, const uint8_t d2, const uint8_t d3) {
                   U32Swap tmp { };

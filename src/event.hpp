@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <atomic>
 #include "clock.hpp"
 
 namespace Sb {
@@ -10,7 +11,7 @@ namespace Sb {
       class Runnable : public std::enable_shared_from_this<Runnable> {
       public:
             explicit Runnable();
-            virtual ~Runnable() = 0;
+            virtual ~Runnable();
       private:
             friend class Engine;
       };
@@ -20,7 +21,7 @@ namespace Sb {
             explicit Event(std::shared_ptr<Runnable> const& owner, std::function<void()> const& func);
             void operator()() const;
             Runnable* owner() const;
-            bool operator==(Event const& rhs) = delete;
+            bool operator==(Event const& rhs);
             Event& operator=(Event const& rhs);
       private:
             std::function<void()> func;

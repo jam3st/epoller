@@ -22,6 +22,10 @@ namespace Sb {
             return *this;
       }
 
+      bool Event::operator==(Event const& rhs) {
+            return runnable == rhs.runnable;
+      }
+
       void Event::operator()() const {
             auto const ref = obj.lock();
             if (ref) {

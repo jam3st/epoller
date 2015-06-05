@@ -3,7 +3,6 @@
 #include <memory>
 #include <thread>
 #include <map>
-#include <unordered_map>
 #include "semaphore.hpp"
 #include "event.hpp"
 #include "timers.hpp"
@@ -40,7 +39,7 @@ namespace Sb {
             NanoSecs doCancelTimer(Event* const timer);
             void setTimerTrigger(Event const* const what, NanoSecs const& when);
             void doInit(int const minWorkersPerCpu);
-            std::shared_ptr<Socket> getSocket(int const fd);
+            std::shared_ptr<Socket> getSocket(uint64_t const id);
             void run(Socket* const sock, const uint32_t events);
             void doEpoll();
             void worker(Worker&me);
@@ -65,13 +64,16 @@ namespace Sb {
             int timerFd = -1;
             std::vector<Worker*> slaves;
             std::mutex evHashLock;
-            std::unordered_map<int, std::shared_ptr<Socket>> eventHash;
+            std::map<uint64_t, std::shared_ptr<Socket>> eventHash;
             Resolver theResolver;
             Timers timers;
       private:
+            uint64_t const timerEvId = 0;
+            uint64_t evCounter = timerEvId;
             std::size_t const NUM_ENGINE_EVENTS = 0;
             std::size_t const EPOLL_EVENTS_PER_RUN = 128;
             NanoSecs const THREAD_TERMINATE_WAIT_TIME = NanoSecs{ONE_MS_IN_NS};
+            bool const retentive = false;
       };
 
       class Engine::Worker {
@@ -83,6 +85,6 @@ namespace Sb {
 
             ~Worker();
             std::thread thread;
-            std::atomic_bool exited;
+            bool exited;
       };
 }

@@ -7,8 +7,8 @@ namespace Sb {
       public:
             Counters();
             ~Counters();
-            void notifyIngress(ssize_t count);
-            void notifyEgress(ssize_t count);
+            void notifyIngress(ssize_t const count);
+            void notifyEgress(ssize_t const count);
             void dumpStats() const;
             ssize_t getIngress() const {
                   return ingress;

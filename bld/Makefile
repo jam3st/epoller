@@ -3,9 +3,9 @@ CLANG_CXX              = clang++
 GCC_CXXFLAGS           = -pipe -std=c++14 -pthread -fdiagnostics-color -flto -fuse-linker-plugin -Wall -Werror -O2 -march=haswell -mcx16 -msahf -mmovbe -maes -mpclmul -mpopcnt -mabm -mno-lwp -mfma -mno-fma4 -mno-xop -mbmi -mbmi2 -mno-tbm -mavx -mavx2 -msse4.2 -msse4.1 -mlzcnt -mrtm -mhle -mrdrnd -mf16c -mfsgsbase -mno-rdseed -mno-prfchw -mno-adx -mfxsr -mxsave -mxsaveopt --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=8192 -mtune=haswell -fomit-frame-pointer -foptimize-register-move -fgcse-after-reload -fpredictive-commoning -ftree-loop-distribution -minline-all-stringops -fprefetch-loop-arrays -fno-tree-pre -fstrength-reduce -fexpensive-optimizations -floop-parallelize-all -ftree-parallelize-loops=8 -floop-interchange -Wall -Werror -fvisibility=hidden -fvisibility-inlines-hidden -fipa-reference -flra-remat -fipa-ra -fipa-reference -fipa-icf
 CLANG_CXXFLAGS         = -pipe -std=c++14 -pthread -fdiagnostics-color -flto -Wall -Werror -O3 -march=haswell -mcx16 -maes -mpclmul -mpopcnt -mfma -mno-fma4 -mno-xop -mbmi -mbmi2 -mno-tbm -mavx -mavx2 -msse4.2 -msse4.1 -mlzcnt -mrtm -mrdrnd -mf16c -mfsgsbase -mno-rdseed -mno-prfchw -mno-adx -mtune=haswell -fomit-frame-pointer -minline-all-stringops -fvisibility=hidden -fvisibility-inlines-hidden 
 GCC_COV_CXXFLAGS       = -pipe -std=c++14 -pthread -fdiagnostics-color -flto -Wall -Werror -O0 -g3 -gdwarf-4 -fno-eliminate-unused-debug-types -fprofile-arcs --coverage
-GCC_LFLAGS             = $(GCC_CXXFLAGS) -ltcmalloc -s
-CLANG_LFLAGS           = $(CLANG_CXXFLAGS) -ltcmalloc -s
-GCC_COV_LFLAGS         = $(GCC_COV_CXXFLAGS) -ltcmalloc -lprofiler -lgcov
+GCC_LFLAGS             = $(GCC_CXXFLAGS) -L../ext/lib -ltcmalloc -s
+CLANG_LFLAGS           = $(CLANG_CXXFLAGS) -L../ext/lib -ltcmalloc -s
+GCC_COV_LFLAGS         = $(GCC_COV_CXXFLAGS) -L../ext/lib -lgcov -lprofiler -ltcmalloc
 
 BUILD_DIR              = ../build
 
@@ -36,7 +36,7 @@ coverage: $(RESULTS_DIR)/index.html
 
 $(RESULTS_DIR)/index.html: $(TARGET_COV) | $(RESULTS_DIR)
 	-rm -rf "$(RESULTS_DIR)/*"
-	env HEAPCHECK=normal "$(TARGET_COV)" || true
+	env HEAPCHECK="as-is" HEAP_CHECK_MAX_LEAKS="0" HEAP_CHECK_IDENTIFY_LEAKS="true" HEAP_CHECK_AFTER_DESTRUCTOR="true" "$(TARGET_COV)" || true
 	lcov --external --base-directory .. --list-full-path --capture --derive-func-data --rc lcov_branch_coverage=1 --directory="$(COV_OBJS_DIR)" --output-file="$(RESULTS_DIR)/info.lcov"
 	lcov --list "$(RESULTS_DIR)/info.lcov"
 	lcov --remove "$(RESULTS_DIR)/info.lcov" "*g++*" -o "$(RESULTS_DIR)/info.lcov.filtered"
@@ -44,8 +44,8 @@ $(RESULTS_DIR)/index.html: $(TARGET_COV) | $(RESULTS_DIR)
 	echo Coverage in: "$(RESULTS_DIR)/index.html"
 
 $(GCC_OBJS_DIR)/%.o: $(SB_SRC_DIR)/%.cpp | $(GCC_OBJS_DIR)
-	$(CLANG_CXX) -MMD --analyze -Xanalyzer -analyzer-output=text $(CLANG_CXXFLAGS) $(INCPATH) -o "$(@)".anal -c "$(<)"
-	$(GCC_CXX) $(GCC_CXXFLAGS) $(INCPATH) -o "$(@)"  -c "$(<)"
+	$(GCC_CXX) -MMD $(GCC_CXXFLAGS) $(INCPATH) -o "$(@)" -c "$(<)"
+	$(CLANG_CXX) --analyze -Xanalyzer -analyzer-output=text $(CLANG_CXXFLAGS) $(INCPATH) -o "$(@)".anal -c "$(<)"
 
 $(CLANG_OBJS_DIR)/%.o: $(SB_SRC_DIR)/%.cpp | $(CLANG_OBJS_DIR)
 	$(CLANG_CXX) -MMD $(CLANG_CXXFLAGS) $(INCPATH) -o "$(@)" -c "$(<)"
@@ -85,4 +85,6 @@ clean:
 
 .PHONY : all clean conv_run
 
--include $(SB_SRCS:%.cpp=$(SB_OBJS_DIR)/%.d)
+-include $(SB_SRCS:%.cpp=$(GCC_OBJS_DIR)/%.d)
+-include $(SB_SRCS:%.cpp=$(CLANG_OBJS_DIR)/%.d)
+-include $(SB_SRCS:%.cpp=$(COV_OBJS_DIR)/%.d)

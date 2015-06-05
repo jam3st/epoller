@@ -4,19 +4,20 @@
 namespace Sb {
       void UdpSocket::create(const uint16_t localPort, std::shared_ptr<UdpSocketIf> client) {
             auto ref = std::make_shared<UdpSocket>(client);
-            Engine::add(ref);
             logDebug("UdpSocket::create() server");
             client->udpSocket = ref;
             ref->bind(localPort);
+            Engine::add(ref);
       }
 
-      void UdpSocket::create(const struct InetDest&dest, std::shared_ptr<UdpSocketIf> client) {
+      void UdpSocket::create(const struct InetDest& dest, std::shared_ptr<UdpSocketIf> client) {
             auto ref = std::make_shared<UdpSocket>(client);
-            Engine::add(ref);
             logDebug("UdpSocket::create() client");
             ref->connect(dest);
             client->udpSocket = ref;
+            ref->makeTransparent();
             client->connected(dest);
+            Engine::add(ref);
       }
 
       UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf> client) : Socket(UDP), client(client) {
@@ -41,7 +42,7 @@ namespace Sb {
             client->received(from, data);
       }
 
-      void UdpSocket::queueWrite(const InetDest&dest, const Bytes&data) {
+      void UdpSocket::queueWrite(const InetDest& dest, const Bytes& data) {
             logDebug("UdpSocket::queueWrite() " + dest.toString() + " " + std::to_string(fd));
             logDebug("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
             std::lock_guard<std::mutex> sync(writeLock);
@@ -54,7 +55,7 @@ namespace Sb {
             Engine::remove(self);
       }
 
-      void UdpSocket::doWrite(const InetDest&dest, const Bytes&data) {
+      void UdpSocket::doWrite(const InetDest& dest, const Bytes& data) {
             logDebug(std::string("UdpSocket::doWrite writing " + dest.toString() + " " + std::to_string(data.size())) + " " + std::to_string(fd));
             const auto actuallySent = sendDatagram(dest, data);
             logDebug(std::string("UdpSocket::doWrite actually wrote " + std::to_string(actuallySent)));

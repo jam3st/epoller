@@ -6,14 +6,13 @@
 #include <sys/socket.h>
 #include "socket.hpp"
 
-
 namespace Sb {
+      constexpr int SO_ORIGINAL_DST = 80;
       typedef union {
             struct sockaddr_in6 addrIn6;
+            struct sockaddr_in addrIn;
             struct sockaddr addr;
       } SocketAddress;
-
-      static std::string addressToString(SocketAddress const& addr);
 
       Socket::Socket(SockType const type, const int fd) : type(type), fd(fd) {
             assert(fd > 0, "Unitialized fd");
@@ -55,13 +54,18 @@ namespace Sb {
       int Socket::createSocket(Socket::SockType const type) {
             int fd = ::socket(AF_INET6, type == UDP ? SOCK_DGRAM : SOCK_STREAM | SOCK_NONBLOCK, 0);
             pErrorThrow(fd, fd);
-            if (type == TCP) {
-                  size_t one = 1;
-                  setsockopt(fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+            int on = 1;
+            switch (type) {
+                  case TCP:
+                        pErrorLog(::setsockopt(fd, SOL_TCP, TCP_NODELAY, &on, sizeof(on)), fd);
+                        break;
+                  case UDP:
+                        pErrorLog(::setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on)), fd);
+                        pErrorLog(::setsockopt(fd, SOL_TCP, SO_ORIGINAL_DST, &on, sizeof(on)), fd);
+                        break;
             }
             return fd;
       }
-
 
       void Socket::reuseAddress() const {
             const int yes = 1;
@@ -79,7 +83,7 @@ namespace Sb {
             }
       }
 
-      ssize_t Socket::read(Bytes&data) const {
+      ssize_t Socket::read(Bytes& data) const {
             int numRead = ::read(fd, &data[0], data.size());
             if (numRead >= 0 && (data.size() - numRead) > 0) {
                   data.resize(numRead);
@@ -87,7 +91,7 @@ namespace Sb {
             return convertFromStdError(numRead);
       }
 
-      ssize_t Socket::write(const Bytes&data) const {
+      ssize_t Socket::write(Bytes const& data) const {
             return convertFromStdError(::write(fd, &data[0], data.size()));
       }
 
@@ -103,24 +107,50 @@ namespace Sb {
             return convertFromStdError(aFd);
       }
 
-      int Socket::receiveDatagram(InetDest& whereFrom, Bytes&data) const {
+      int Socket::receiveDatagram(InetDest& whereFrom, Bytes& data) const {
+            struct iovec iovec[]{{&data[0], data.size()}};
+            uint8_t msgHeader[1024];
             SocketAddress addr;
-            socklen_t addrLen = sizeof(addr.addrIn6);
-            const auto numReceived = ::recvfrom(fd, &data[0], data.size(), 0, &addr.addr, &addrLen);
+            struct msghdr msg{&addr, sizeof(addr), &iovec[0], sizeof(iovec) / sizeof(iovec[0]), &msgHeader[0], sizeof(msgHeader) / sizeof(msgHeader[0]), 0};
+            const auto numReceived = ::recvmsg(fd, &msg, 0);
+            if (numReceived >= 0 && (data.size() - numReceived) > 0) {
+                  data.resize(numReceived);
+            }
             pErrorLog(numReceived, fd);
+
+            struct cmsghdr* cmsg;
+            for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != nullptr && cmsg->cmsg_level >= 0; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+                  if (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_PKTINFO) {
+                        auto const& pktInfo = *reinterpret_cast<struct in6_pktinfo*>(CMSG_DATA(cmsg));
+                        std::array<uint8_t, IP_ADDRESS_BIT_LEN / NUM_BITS_PER_SIZE_T> fromNetOrder;
+                        ::memcpy(&fromNetOrder, &pktInfo.ipi6_addr, sizeof(fromNetOrder));
+                        InetDest x;
+                        x.addr.set(fromNetOrder);
+                        x.ifIndex = pktInfo.ipi6_ifindex;
+                        logError("bound address if: " + std::to_string(x.ifIndex) + " " + x.toString());
+                  }
+            }
             std::array<uint8_t, IP_ADDRESS_BIT_LEN / NUM_BITS_PER_SIZE_T> fromNetOrder;
-            assert(addrLen == sizeof(addr.addrIn6), "Buggy address len");
             ::memcpy(&fromNetOrder, &addr.addrIn6.sin6_addr, sizeof(fromNetOrder));
             whereFrom.addr.set(fromNetOrder);
             whereFrom.port = networkEndian(addr.addrIn6.sin6_port);
-            logDebug("Datagram from " + addressToString(addr) + " " + std::to_string(whereFrom.port));
-            if (numReceived >= 0 && data.size() - numReceived > 0) {
-                  data.resize(numReceived);
-            }
             return numReceived;
       }
+      //            socklen_t addrLen = sizeof(addr.addrIn6);
+      //            const auto numReceived = ::recvfrom(fd, &data[0], data.size(), 0, &addr.addr, &addrLen);
+      //            pErrorLog(numReceived, fd);
+      //            std::array<uint8_t, IP_ADDRESS_BIT_LEN / NUM_BITS_PER_SIZE_T> fromNetOrder;
+      //            assert(addrLen == sizeof(addr.addrIn6), "Buggy address len");
+      //            ::memcpy(&fromNetOrder, &addr.addrIn6.sin6_addr, sizeof(fromNetOrder));
+      //            whereFrom.addr.set(fromNetOrder);
+      //            whereFrom.port = networkEndian(addr.addrIn6.sin6_port);
+      //            logDebug("Datagram from " + addressToString(addr) + " " + std::to_string(whereFrom.port));
+      //            if (numReceived >= 0 && data.size() - numReceived > 0) {
+      //                  data.resize(numReceived);
+      //            }
+      //            return numReceived;
 
-      int Socket::sendDatagram(const InetDest&whereTo, const Bytes&data) const {
+      int Socket::sendDatagram(const InetDest& whereTo, const Bytes& data) const {
             SocketAddress addr;
             addr.addrIn6.sin6_family = AF_INET6;
             addr.addrIn6.sin6_port = networkEndian(whereTo.port);
@@ -154,11 +184,11 @@ namespace Sb {
       int Socket::getLastError() const {
             socklen_t len = sizeof(errno);
             auto ret = getsockopt(fd, SOL_SOCKET, SO_ERROR, &errno, &len);
-            pErrorLog(errno,fd);
+            pErrorLog(errno, fd);
             return ret;
       }
 
-      InetDest Socket::destFromString(const std::string&where, const uint16_t port) {
+      InetDest Socket::destFromString(const std::string& where, const uint16_t port) {
             InetDest dest;
             dest.port = port;
             dest.valid = false;
@@ -173,36 +203,40 @@ namespace Sb {
             return dest;
       }
 
-      std::string addressToString(SocketAddress const& addr) {
-            char buf[INET6_ADDRSTRLEN];
-            inet_ntop(AF_INET6, &addr.addrIn6.sin6_addr, buf, sizeof buf);
-            return std::string(buf);
-      }
-
       void Socket::makeTransparent() const {
-            int const nz = 1;
-            pErrorLog(setsockopt(fd, SOL_IP, IP_TRANSPARENT, &nz, sizeof(nz)), fd);
+            int const on = 1;
+            pErrorLog(setsockopt(fd, SOL_IP, IP_TRANSPARENT, &on, sizeof(on)), fd);
       }
 
       InetDest Socket::originalDestination() const {
-
+            assert(type == TCP, "Only valid for TCP");
             InetDest from;
             SocketAddress addr;
-            socklen_t addrLen = sizeof addr.addrIn6;
-            const int IP6T_SO_ORIGINAL_DST = 80;
-            auto ret = ::getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST,  &addr, &addrLen);
-//            auto ret = ::getsockname(fd, &addr.addr, &addrLen);
-            if(ret < 0) {
-                  pErrorLog(ret, fd);
-            }
-            std::array<uint8_t, IP_ADDRESS_BIT_LEN / NUM_BITS_PER_SIZE_T> fromNetOrder;
-            assert(addrLen == sizeof(addr.addrIn6), "Buggy address len");
-            ::memcpy(&fromNetOrder, &addr.addrIn6.sin6_addr, sizeof(fromNetOrder));
-            from.addr.set(fromNetOrder);
-            from.port = networkEndian(addr.addrIn6.sin6_port);
-//            logDebug("ORIG DST is " +  from.toString());
-            return from;
 
+            socklen_t addrLen = sizeof(addr.addr);
+            auto ret = ::getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &addr.addr, &addrLen);
+            if (ret == 0) {
+                  assert(addrLen == sizeof(addr.addrIn), "Buggy address len");
+                  from.addr.setIpV4(addr.addrIn.sin_addr.s_addr);
+                  from.port = networkEndian(addr.addrIn.sin_port);
+                  from.valid = true;
+            } else {
+                  socklen_t addrLen = sizeof addr.addrIn6;
+                  ret = ::getsockopt(fd, SOL_IPV6, SO_ORIGINAL_DST, &addr, &addrLen);
+                  if(ret == 0) {
+                        std::array<uint8_t, IP_ADDRESS_BIT_LEN / NUM_BITS_PER_SIZE_T> fromNetOrder;
+                        assert(addrLen == sizeof(addr.addrIn6), "Buggy address len");
+                        ::memcpy(&fromNetOrder, &addr.addrIn6.sin6_addr, sizeof(fromNetOrder));
+                        from.addr.set(fromNetOrder);
+                        from.port = networkEndian(addr.addrIn6.sin6_port);
+                        from.valid = true;
+                  }
+            }
+            if (ret < 0) {
+                  pErrorLog(ret, fd);
+                  from.valid = false;
+            }
+            return from;
       }
 
       void Socket::onReadComplete() {

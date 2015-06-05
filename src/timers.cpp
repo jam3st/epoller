@@ -22,7 +22,7 @@ namespace Sb {
             auto iiByOwner = timersByOwner.equal_range(what);
             TimePointNs prevTp = SteadyClock::now();
             if (iiByOwner.first != iiByOwner.second) {
-                  for_each(iiByOwner.first, iiByOwner.second, [&, timer](const auto&bo) {
+                  for_each(iiByOwner.first, iiByOwner.second, [&, timer](auto const& bo) {
                         auto iiByDate = timesByDate.equal_range(bo.second.tp);
                         if (iiByDate.first != iiByDate.second) {
                               for (auto it = iiByDate.first; it != iiByDate.second; ++it) {
@@ -33,7 +33,7 @@ namespace Sb {
                               }
                         }
                   });
-                  auto it = std::find_if(iiByOwner.first, iiByOwner.second, [&timer](const auto&tp) {
+                  auto it = std::find_if(iiByOwner.first, iiByOwner.second, [&timer](auto const& tp) {
                         return timer == tp.second.id;
                   });
                   if (it != iiByOwner.second) {
@@ -41,6 +41,7 @@ namespace Sb {
                         timersByOwner.erase(it);
                   }
             }
+            assert(timesByDate.size() == timersByOwner.size(), "Timers::removeTimer Timer mismatch");
             return prevTp;
       }
 
@@ -53,33 +54,34 @@ namespace Sb {
             }
       }
 
+      Timers::TimerRunnableId Timers::getStartEvent() const {
+            if(timesByDate.size() > 0) {
+                  return TimerRunnableId{ timesByDate.begin()->second.ep , timesByDate.begin()->second.id};
+            } else {
+                  return TimerRunnableId {nullptr, nullptr};
+            }
+      }
+
       NanoSecs Timers::cancelTimer(Runnable* const what, Event* const timer) {
             std::lock_guard<std::mutex> sync(timeLock);
-            auto oldStart = timesByDate.begin();
-            auto timerCount = removeTimer(what, timer) - SteadyClock::now();
-            if (oldStart != timesByDate.begin()) {
+            TimerRunnableId oldStartEvent = getStartEvent();
+            auto const timerCount = removeTimer(what, timer) - SteadyClock::now();
+            if(oldStartEvent != getStartEvent()) {
                   setTrigger();
             }
             return timerCount;
       }
 
       NanoSecs Timers::setTimer(Runnable* const what, Event* const timer, const NanoSecs&timeout) {
+            std::lock_guard<std::mutex> sync(timeLock);
             auto now = SteadyClock::now();
             TimePointNs when = now + timeout;
-            std::lock_guard<std::mutex> lock(timeLock);
-            struct {
-                  TimePointNs st;
-                  Runnable* ep;
-                  Event* id;
-            } oldStart{zeroTimePoint, nullptr, nullptr}, newStart{zeroTimePoint, nullptr, nullptr};
-            if (timesByDate.begin() != timesByDate.end()) {
-                  oldStart = {timesByDate.begin()->first, timesByDate.begin()->second.ep, timesByDate.begin()->second.id};
-            }
-            auto timerCount = removeTimer(what, timer) - SteadyClock::now();
-            timersByOwner.insert(std::make_pair(what, TimerDateId {when, timer}));
-            timesByDate.insert(std::make_pair(when, TimerEpollId {what, timer}));
-            newStart = {timesByDate.begin()->first, timesByDate.begin()->second.ep, timesByDate.begin()->second.id};
-            if (oldStart.id != newStart.id || oldStart.ep != newStart.ep || oldStart.st != newStart.st) {
+            TimerRunnableId oldStartEvent = getStartEvent();
+            auto const timerCount = removeTimer(what, timer) - SteadyClock::now();
+            timersByOwner.emplace(what, TimerDateId {when, timer});
+            timesByDate.emplace(when, TimerRunnableId {what, timer});
+            assert(timesByDate.size() == timersByOwner.size(), "Timers::setTimer Timer mismatch");
+            if(oldStartEvent != getStartEvent()) {
                   setTrigger();
             }
             return timerCount;
@@ -87,20 +89,22 @@ namespace Sb {
 
       void Timers::cancelAllTimers(Runnable* const what) {
             std::lock_guard<std::mutex> sync(timeLock);
-            auto oldStart = timesByDate.begin();
+            TimerRunnableId oldStartEvent = getStartEvent();
             auto iiByOwner = timersByOwner.equal_range(what);
-            for_each(iiByOwner.first, iiByOwner.second, [&](const auto&bo) {
+            for_each(iiByOwner.first, iiByOwner.second, [&](auto const& bo) {
                   auto iiByDate = timesByDate.equal_range(bo.second.tp);
                   timesByDate.erase(iiByDate.first, iiByDate.second);
             });
             timersByOwner.erase(iiByOwner.first, iiByOwner.second);
-            if (timesByDate.begin() == timesByDate.end() || oldStart != timesByDate.begin()) {
+            assert(timesByDate.size() == timersByOwner.size(), "Timers::cancelAllTimers Timer mismatch");
+            if(oldStartEvent != getStartEvent()) {
                   setTrigger();
             }
       }
 
       void Timers::clear() {
-            std::lock_guard<std::mutex> sync(timeLock);
+            assert(timesByDate.size() == 0, "timesByDate should be empty");
+            assert(timersByOwner.size() == 0, "timersByOwner should be empty");
             timesByDate.clear();
             timersByOwner.clear();
       }

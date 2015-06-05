@@ -12,5 +12,9 @@ namespace Sb {
       constexpr int64_t NanoSecsInSecs{ONE_SEC_IN_NS};
       namespace Clock {
             uint64_t now();
+            template<typename T, typename U>
+            inline auto elapsed(T const& start, U const& end) -> decltype(end - start) const {
+                  return end - start;
+            }
       }
 }
