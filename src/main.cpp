@@ -323,7 +323,6 @@ void HttpProxy::disconnect() {
       auto tcpRef = tcpStream.lock();
       if(tcpRef) {
             if(!tcpRef->writeQueueEmpty()) {
-                  logDebug("DC NOT EMPTY");
                   disconnectWhenCompleted = true;
                   return;
             }
