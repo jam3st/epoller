@@ -262,7 +262,6 @@ namespace Sb {
                                           ++it;
                                     }
                               }
-
                         }
                   }
             }
