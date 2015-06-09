@@ -20,9 +20,9 @@ namespace Sb {
 
       TcpConn::~TcpConn() {
             Engine::resolver().cancel(this);
-            auto ref = client;
-            if (ref != nullptr) {
-                  ref->disconnected();
+            std::lock_guard<std::mutex> sync(lock);
+            if (client) {
+                  client->disconnected();
             }
       }
 
@@ -43,9 +43,6 @@ namespace Sb {
       void TcpConn::notResolved() {
             logDebug("TcpConn::notResolved error not connecting");
             std::lock_guard<std::mutex> sync(lock);
-            if (client) {
-                  client->disconnected();
-                  client = nullptr;
-            }
+            self = nullptr;
       }
 }

@@ -45,8 +45,8 @@ namespace Sb {
             public:
                   Resolver::AddrPref prefs;
                   std::vector<std::shared_ptr<ResolverIf>> clients;
-                  std::vector<std::weak_ptr<UdpResolver>> resolvers;
-                  std::unique_ptr<Event> timeout;
+                  std::vector<std::weak_ptr<UdpSocketIf>> resolvers;
+                  Event timeout;
             };
 
             std::unordered_map<std::uint16_t, ResolverQuery> resQueries;

@@ -22,7 +22,7 @@ namespace Sb {
                   logDebug("UdpResolver::connected " + to.toString());
                   auto sock = udpSocket.lock();
                   if (sock) {
-                        sock->queueWrite(to, Query::resolve(requestNo, name, qType));
+                        dynamic_cast<UdpSocket*>(sock.get())->queueWrite(to, Query::resolve(requestNo, name, qType));
                   }
             }
 
@@ -50,7 +50,7 @@ namespace Sb {
                   logDebug("UdpResolver::onWriteCompleted");
                   auto sock = udpSocket.lock();
                   if (sock) {
-                        sock->disconnect();
+                        dynamic_cast<UdpSocket*>(sock.get())->disconnect();
                   }
             }
 
@@ -110,20 +110,20 @@ namespace Sb {
                   }
             } else {
                   logDebug("adding request " + std::to_string(request));
-                  resQueries[request] = {prefs, {}, {}, std::make_unique<Event>(shared_from_this(), std::bind(&ResolverImpl::queryTimedout, this, request))};
+                  resQueries[request] = {prefs, {}, {}, Event(shared_from_this(), std::bind(&ResolverImpl::queryTimedout, this, request))};
                   resQueries[request].prefs = prefs;
                   if (prefs != Resolver::AddrPref::Ipv4Only) {
-                        auto resolver = std::make_shared<UdpResolver>(*this, request, name, Query::Qtype::Aaaa);
+                        std::shared_ptr<UdpSocketIf> resolver = std::make_shared<UdpResolver>(*this, request, name, Query::Qtype::Aaaa);
                         UdpSocket::create(nameServer, resolver);
                         resQueries[request].clients.push_back(client);
                   }
                   if (prefs != Resolver::AddrPref::Ipv6Only) {
-                        auto resolver = std::make_shared<UdpResolver>(*this, request, name, Query::Qtype::A);
+                        std::shared_ptr<UdpSocketIf> resolver = std::make_shared<UdpResolver>(*this, request, name, Query::Qtype::A);
                         resQueries[request].resolvers.push_back(resolver);
                         UdpSocket::create(nameServer, resolver);
                         resQueries[request].clients.push_back(client);
                   }
-                  Engine::setTimer(resQueries[request].timeout.get(), timeout);
+                  Engine::setTimer(resQueries[request].timeout, timeout);
                   request++;
             }
       }
@@ -201,7 +201,7 @@ namespace Sb {
                                     completedError = true;
                               }
                         }
-                        Engine::cancelTimer(it->second.timeout.get());
+                        Engine::cancelTimer(it->second.timeout);
                         resQueries.erase(it);
                   }
             }

@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <cstdint>
 #include <chrono>
+#include <functional>
 #include "constants.hpp"
 
 namespace Sb {
@@ -11,10 +12,15 @@ namespace Sb {
       TimePointNs const zeroTimePoint{std::chrono::duration_cast<NanoSecs>(NanoSecs {0})};
       constexpr int64_t NanoSecsInSecs{ONE_SEC_IN_NS};
       namespace Clock {
-            uint64_t now();
+            int64_t now();
             template<typename T, typename U>
             inline auto elapsed(T const& start, U const& end) -> decltype(end - start) const {
                   return end - start;
             }
       }
+      struct HashTimePointNs {
+            size_t operator()(TimePointNs const& tp) const {
+                  return std::hash<int64_t>()(Clock::elapsed(zeroTimePoint, tp).count());
+            }
+      };
 }

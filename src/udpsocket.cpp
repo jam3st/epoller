@@ -2,31 +2,37 @@
 #include "engine.hpp"
 
 namespace Sb {
-      void UdpSocket::create(const uint16_t localPort, std::shared_ptr<UdpSocketIf> client) {
-            auto ref = std::make_shared<UdpSocket>(client);
-            logDebug("UdpSocket::create() server");
-            client->udpSocket = ref;
-            ref->bind(localPort);
-            Engine::add(ref);
+      void UdpSocket::create(uint16_t const localPort, std::shared_ptr<UdpSocketIf>& client) {
+            std::shared_ptr<Socket> ref = std::make_shared<UdpSocket>(client);
+            dynamic_cast<UdpSocket*>(ref.get())->bindAndAdd(ref, localPort, client);
       }
 
-      void UdpSocket::create(const struct InetDest& dest, std::shared_ptr<UdpSocketIf> client) {
-            auto ref = std::make_shared<UdpSocket>(client);
-            logDebug("UdpSocket::create() client");
-            ref->connect(dest);
-            client->udpSocket = ref;
-            ref->makeTransparent();
-            client->connected(dest);
-            Engine::add(ref);
+      void UdpSocket::create(InetDest const& dest, std::shared_ptr<UdpSocketIf>& client) {
+            std::shared_ptr<Socket> ref = std::make_shared<UdpSocket>(client);
+            dynamic_cast<UdpSocket*>(ref.get())->connectAndAdd(ref, dest, client);
       }
 
-      UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf> client) : Socket(UDP), client(client) {
+      UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf>& client) : Socket(UDP), client(client) {
             logDebug(std::string("UdpClient::UdpClient " + std::to_string(fd)));
             pErrorThrow(fd);
       }
 
       UdpSocket::~UdpSocket() {
-            logDebug("UdpSocket::~UdpSocket() " + std::to_string(fd));
+      }
+
+      void UdpSocket::connectAndAdd(std::shared_ptr<Socket>& me, InetDest const& dest, std::shared_ptr<UdpSocketIf>& client) {
+            client->udpSocket = me;
+            makeTransparent();
+            Engine::add(me);
+            connect(dest);
+            client->connected(dest);
+      }
+
+      void UdpSocket::bindAndAdd(std::shared_ptr<Socket>& me, uint16_t const localPort, std::shared_ptr<UdpSocketIf>& client) {
+            client->udpSocket = me;
+            makeTransparent();
+            Engine::add(me);
+            bind(localPort);
       }
 
       void UdpSocket::handleRead() {

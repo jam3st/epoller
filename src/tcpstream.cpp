@@ -5,36 +5,39 @@ namespace Sb {
       void TcpStream::create(std::shared_ptr<TcpStreamIf> client, int const fd) {
             auto ref = std::make_shared<TcpStream>(client, fd);
             client->tcpStream = ref;
-            ref->notifyWriteComplete = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncWriteComplete, ref.get()));
-            ref->activity = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncDisconnect, ref.get()));
-            ref->egress = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncEgress, ref.get()));
-            ref->connected = true;
-            Engine::runAsync(ref->notifyWriteComplete.get());
-            ref->originalDestination();
-//            { ref->egressRate = 4096 * 1024; }
-            Engine::add(ref);
+            auto sock = dynamic_cast<TcpStream*>(ref.get());
+            sock->notifyWriteComplete = Event(ref, std::bind(&TcpStream::asyncWriteComplete, sock));
+            sock->activity = Event(ref, std::bind(&TcpStream::asyncDisconnect, sock));
+            sock->egress = Event(ref, std::bind(&TcpStream::asyncEgress, sock));
+            sock->connected = true;
+            Engine::runAsync(sock->notifyWriteComplete);
+            dynamic_cast<TcpStream*>(ref.get())->originalDestination();
+            { ref->egressRate = 4096 * 1024; }
+            std::shared_ptr<Socket> sockRef = ref;
+            Engine::add(sockRef);
       }
 
       void TcpStream::create(std::shared_ptr<TcpStreamIf> client, InetDest const& dest) {
             auto ref = std::make_shared<TcpStream>(client);
+            auto sock = dynamic_cast<TcpStream*>(ref.get());
             client->tcpStream = ref;
-            ref->notifyWriteComplete = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncWriteComplete, ref.get()));
-            ref->activity = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncDisconnect, ref.get()));
-            ref->egress = std::make_unique<Event>(ref, std::bind(&TcpStream::asyncEgress, ref.get()));
+            sock->notifyWriteComplete = Event(ref, std::bind(&TcpStream::asyncWriteComplete, sock));
+            sock->activity = Event(ref, std::bind(&TcpStream::asyncDisconnect, sock));
+            sock->egress = Event(ref, std::bind(&TcpStream::asyncEgress, sock));
 
-            auto const err = ref->connect(dest);
+            auto const err = dynamic_cast<TcpStream*>(ref.get())->connect(dest);
             if(err >= 0) {
-                  ref->connected = true;
-                  Engine::setTimer(ref->activity.get(), ref->inactivityTimeout);
+                  sock->connected = true;
+                  Engine::setTimer(sock->activity, sock->inactivityTimeout);
             } else if(err == -1) {
-                  ref->connected = false;
-                  Engine::setTimer(ref->activity.get(), ref->inactivityTimeout);
+                  dynamic_cast<TcpStream*>(ref.get())->connected = false;
+                  Engine::setTimer(sock->activity, sock->inactivityTimeout);
             } else {
-                  pErrorLog(err, ref->fd);
+                  pErrorLog(err, sock->fd);
                   return;
             }
-
-            Engine::add(ref);
+            std::shared_ptr<Socket> sockRef = ref;
+            Engine::add(sockRef);
       }
 
       TcpStream::TcpStream(std::shared_ptr<TcpStreamIf> client) : Socket(TCP), client(client) {
@@ -49,9 +52,8 @@ namespace Sb {
             std::lock_guard<std::mutex> syncRead(readLock);
             client->disconnected();
             client = nullptr;
-            Engine::cancelTimer(activity.get());
-            Engine::cancelTimer(egress.get());
-            notifyWriteComplete.reset();
+            Engine::cancelTimer(activity);
+            Engine::cancelTimer(egress);
       }
 
       void TcpStream::handleRead() {
@@ -61,7 +63,7 @@ namespace Sb {
                   auto const actuallyRead = read(data);
                   if(actuallyRead > 0) {
                         counters.notifyIngress(actuallyRead);
-                        Engine::setTimer(activity.get(), inactivityTimeout);
+                        Engine::setTimer(activity, inactivityTimeout);
                         if(client) {
                               client->received(data);
                         }
@@ -95,7 +97,7 @@ namespace Sb {
                                           writeQueue.push_front(Bytes(data.begin() + actuallySent, data.end()));
                                     }
                                     counters.notifyEgress(actuallySent);
-                                    Engine::setTimer(activity.get(), inactivityTimeout);
+                                    Engine::setTimer(activity, inactivityTimeout);
                                     totalWritten += actuallySent;
                                     decltype(egressRate) elapsedNs = Clock::elapsed(start, SteadyClock::now()).count();
                                     if(elapsedNs <= 0) {
@@ -106,7 +108,7 @@ namespace Sb {
                                           writeTriggered = true;
                                           blocked = true;
                                           auto const nextWriteAt = MAX_PACKET_SIZE * ONE_SEC_IN_NS / egressRate;
-                                          Engine::setTimer(egress.get(), NanoSecs{nextWriteAt});
+                                          Engine::setTimer(egress, NanoSecs{nextWriteAt});
                                           break;
                                     } else {
                                           continue;
@@ -123,18 +125,16 @@ namespace Sb {
                   bool isEmpty = (writeQueue.size() == 0);
                   if(!once || (!wasEmpty && isEmpty)) {
                         once = true;
-                        Engine::runAsync(notifyWriteComplete.get());
+                        Engine::runAsync(notifyWriteComplete);
                   }
             } else {
                   connected = true;
-                  if(activity) {
-                        Engine::setTimer(activity.get(), inactivityTimeout);
-                  }
+                  Engine::setTimer(activity, inactivityTimeout);
                   if(writeQueue.size() > 0) {
                         writeTriggered = true;
                         Engine::triggerWrites(this);
                   } else {
-                        Engine::runAsync(notifyWriteComplete.get());
+                        Engine::runAsync(notifyWriteComplete);
                   }
             }
       }
@@ -157,7 +157,6 @@ namespace Sb {
       }
 
       void TcpStream::asyncDisconnect() {
-            logDebug("INACTIVE - DIE DIE DIE");
             disconnect();
       }
 

@@ -20,7 +20,7 @@ namespace Sb {
             std::weak_ptr<TcpStream> tcpStream;
       };
 
-      class TcpStream : virtual public Socket {
+      class TcpStream : public Socket {
       public:
             static void create(std::shared_ptr<TcpStreamIf> client, int const fd);
             static void create(std::shared_ptr<TcpStreamIf> client, InetDest const&dest);
@@ -51,9 +51,9 @@ namespace Sb {
             bool writeTriggered = false;
             bool connected = false;
             bool disconnecting = false;
-            std::unique_ptr<Event> notifyWriteComplete;
-            std::unique_ptr<Event> activity;
-            std::unique_ptr<Event> egress;
+            Event notifyWriteComplete;
+            Event activity;
+            Event egress;
             bitsPerSecond egressRate = 0; //8ULL * 1024ULL * 1024ULL;
             Counters counters;
             NanoSecs inactivityTimeout = NanoSecs{60 * ONE_SEC_IN_NS};

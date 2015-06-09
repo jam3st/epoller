@@ -180,14 +180,14 @@ public:
       virtual void received(const Bytes& x) override {
             auto ref = ep.lock();
             if(ref) {
-                  reinterpret_cast<HttpProxy*>(ref.get())->queueWrite(x);
+                  dynamic_cast<HttpProxy*>(ref.get())->queueWrite(x);
             }
       }
 
       virtual void disconnected() override {
             auto ref = ep.lock();
             if(ref) {
-                  reinterpret_cast<HttpProxy*>(ref.get())->disconnect();
+                  dynamic_cast<HttpProxy*>(ref.get())->disconnect();
             }
       }
 
@@ -308,8 +308,11 @@ void HttpProxy::writeComplete() {
             if(!remoteDest.valid && ref->didConnect()) {
                   remoteDest = ref->endPoint();
             }
-            if(disconnectWhenCompleted) {
-                  disconnectRemote();
+      }
+      if(disconnectWhenCompleted) {
+            auto tcpRef = tcpStream.lock();
+            if(tcpRef) {
+                  tcpRef->disconnect();
             }
       }
 }
@@ -322,9 +325,10 @@ void HttpProxy::disconnected() {
 void HttpProxy::disconnect() {
       auto tcpRef = tcpStream.lock();
       if(tcpRef) {
-            if(!tcpRef->writeQueueEmpty()) {
+            if(tcpRef->writeQueueEmpty()) {
+                  tcpRef->disconnect();
+            } else {
                   disconnectWhenCompleted = true;
-                  return;
             }
       }
 }
@@ -360,18 +364,18 @@ public:
       }
 
       void set() {
-            timer = std::make_unique<Event>(shared_from_this(), std::bind(&PingTimer::timedout, this));
-            Engine::setTimer(timer.get(), NanoSecs {ONE_SEC_IN_NS});
+            timer = Event(shared_from_this(), std::bind(&PingTimer::timedout, this));
+            Engine::setTimer(timer, NanoSecs {ONE_SEC_IN_NS});
       }
 
 private:
       void timedout() {
             logDebug("PING");
-            Engine::setTimer(timer.get(), NanoSecs {ONE_SEC_IN_NS});
+            Engine::setTimer(timer, NanoSecs {ONE_SEC_IN_NS});
       }
 
 private:
-      std::unique_ptr<Event> timer;
+      Event timer;
 };
 
 class ExitTimer : public Runnable {
@@ -380,18 +384,18 @@ public:
       }
 
       void setTimers() {
-            timer0 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 0));
-            timer1 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 1));
-            timer2 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 2));
-            timer3 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 3));
-            timer4 = std::make_unique<Event>(shared_from_this(), std::bind(&ExitTimer::timedout, this, 4));
-            Engine::cancelTimer(timer0.get());
-            Engine::setTimer(timer0.get(), NanoSecs {5 * ONE_SEC_IN_NS});
-            Engine::setTimer(timer4.get(), NanoSecs {4 * ONE_SEC_IN_NS});
-            Engine::setTimer(timer3.get(), NanoSecs {3 * ONE_SEC_IN_NS});
-            Engine::setTimer(timer1.get(), NanoSecs {1 * ONE_SEC_IN_NS});
-            Engine::setTimer(timer2.get(), NanoSecs {2 * ONE_SEC_IN_NS});
-            Engine::cancelTimer(timer1.get());
+            timer0 = Event(shared_from_this(), std::bind(&ExitTimer::timedout, this, 0));
+            timer1 = Event(shared_from_this(), std::bind(&ExitTimer::timedout, this, 1));
+            timer2 = Event(shared_from_this(), std::bind(&ExitTimer::timedout, this, 2));
+            timer3 = Event(shared_from_this(), std::bind(&ExitTimer::timedout, this, 3));
+            timer4 = Event(shared_from_this(), std::bind(&ExitTimer::timedout, this, 4));
+            Engine::cancelTimer(timer0);
+            Engine::setTimer(timer0, NanoSecs {5 * ONE_SEC_IN_NS});
+            Engine::setTimer(timer4, NanoSecs {4 * ONE_SEC_IN_NS});
+            Engine::setTimer(timer3, NanoSecs {3 * ONE_SEC_IN_NS});
+            Engine::setTimer(timer1, NanoSecs {1 * ONE_SEC_IN_NS});
+            Engine::setTimer(timer2, NanoSecs {2 * ONE_SEC_IN_NS});
+            Engine::cancelTimer(timer1);
       }
 
 private:
@@ -400,11 +404,11 @@ private:
       }
 
 private:
-      std::unique_ptr<Event> timer0;
-      std::unique_ptr<Event> timer1;
-      std::unique_ptr<Event> timer2;
-      std::unique_ptr<Event> timer3;
-      std::unique_ptr<Event> timer4;
+      Event timer0;
+      Event timer1;
+      Event timer2;
+      Event timer3;
+      Event timer4;
 };
 
 class EchoUdp : public UdpSocketIf {
@@ -436,35 +440,38 @@ public:
 
 int main(const int, const char* const argv[]) {
       ::close(0);
-      //      auto exitTimer = std::make_shared<ExitTimer>();
-      //      runUnit("timer", [&exitTimer]() {
-      //            exitTimer->setTimers();
-      //      });
-      //      exitTimer.reset();
-      //      runUnit("resolve",[] () {
-      //           Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "asdasdasd", Resolver::AddrPref::AnyAddr);
-      //      });
-      //      runUnit("resolve",[] () {
-      //            Engine::resolver().resolve(std::make_shared<ResolveNameSy>(), "ipv6.google.com", Resolver::AddrPref::AnyAddr);
-      //      });
-      //      runUnit("echoudp", []() {
-      //            UdpSocket::create(1024, std::make_shared<EchoUdp>());
-      //      });
-      //      runUnit("echotcp", []() {
-      //            TcpListener::create(1024, []() {
-      //                  return std::make_shared<TcpEcho>();
-      //            });
-      //      });
-      //      runUnit("sinktcp", []() {
-      //            TcpListener::create(1024, []() {
-      //                  return std::make_shared<TcpSink>();
-      //            });
-      //      });
-      //      runUnit("splattcp", []() {
-      //            TcpListener::create(1024, []() {
-      //                  return std::make_shared<TcpSplat>();
-      //            });
-      //      });
+//      auto exitTimer = std::make_shared<ExitTimer>();
+//      runUnit("timer", [&exitTimer]() {
+//            exitTimer->setTimers();
+//      });
+//      exitTimer.reset();
+//      runUnit("resolve",[] () {
+//            std::shared_ptr<ResolverIf> ref = std::make_shared<ResolveNameSy>();
+//            Engine::resolver().resolve(ref, "asdasdasd", Resolver::AddrPref::AnyAddr);
+//      });
+//      runUnit("resolve",[] () {
+//            std::shared_ptr<ResolverIf> ref = std::make_shared<ResolveNameSy>();
+//            Engine::resolver().resolve(ref, "ipv6.google.com", Resolver::AddrPref::AnyAddr);
+//      });
+//      runUnit("echoudp", []() {
+//            std::shared_ptr<UdpSocketIf> ref = std::make_shared<EchoUdp>();
+//            UdpSocket::create(1024, ref);
+//      });
+//      runUnit("echotcp", []() {
+//            TcpListener::create(1024, []() {
+//                  return std::make_shared<TcpEcho>();
+//            });
+//      });
+//      runUnit("sinktcp", []() {
+//            TcpListener::create(1024, []() {
+//                  return std::make_shared<TcpSink>();
+//            });
+//      });
+//      runUnit("splattcp", []() {
+//            TcpListener::create(1024, []() {
+//                  return std::make_shared<TcpSplat>();
+//            });
+//      });
       runUnit("httpproxy", []() {
             TcpListener::create(1024, []() {
                   return std::make_shared<HttpProxy>();

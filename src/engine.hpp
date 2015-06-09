@@ -15,13 +15,13 @@ namespace Sb {
             static void start(int minWorkersPerCpu = 4);
             static void stop();
             static void init();
-            static void add(std::shared_ptr<Socket> what);
+            static void add(std::shared_ptr<Socket>& what);
             static void remove(std::weak_ptr<Socket>& what);
             static void triggerWrites(Socket* const what);
-            static void runAsync(Event* const event);
+            static void runAsync(Event const& event);
             static Resolver&resolver();
-            static NanoSecs setTimer(Event* const timer, NanoSecs const&timeout);
-            static NanoSecs cancelTimer(Event* const timer);
+            static NanoSecs setTimer(Event const& timer, NanoSecs const&timeout);
+            static NanoSecs cancelTimer(Event const& timer);
             ~Engine();
             void startWorkers(int const minWorkersPerCpu);
             void stopWorkers();
@@ -35,18 +35,18 @@ namespace Sb {
             void doStop();
             void doSignalHandler();
             void handleTimerExpired();
-            NanoSecs doSetTimer(Event* const timer, NanoSecs const& timeout);
-            NanoSecs doCancelTimer(Event* const timer);
+            NanoSecs doSetTimer(Event const& timer, NanoSecs const& timeout);
+            NanoSecs doCancelTimer(Event const& timer);
             void setTimerTrigger(Event const* const what, NanoSecs const& when);
             void doInit(int const minWorkersPerCpu);
-            std::shared_ptr<Socket> getSocket(uint64_t const id);
+            void newEvent(uint64_t const evId, uint32_t const events);
             void run(Socket* const sock, const uint32_t events);
             void doEpoll();
             void worker(Worker&me);
-            void doAdd(std::shared_ptr<Socket> what);
+            void doAdd(std::shared_ptr<Socket>& what);
             void doRemove(std::weak_ptr<Socket>& what);
             void doTriggerWrites(Socket* const what);
-            void doRunAsync(Event* const event);
+            void doRunAsync(Event const& event);
             void clearTimer() const;
 
       private:
@@ -73,7 +73,6 @@ namespace Sb {
             std::size_t const NUM_ENGINE_EVENTS = 0;
             std::size_t const EPOLL_EVENTS_PER_RUN = 128;
             NanoSecs const THREAD_TERMINATE_WAIT_TIME = NanoSecs{ONE_MS_IN_NS};
-            bool const retentive = false;
       };
 
       class Engine::Worker {
