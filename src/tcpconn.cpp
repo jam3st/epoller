@@ -2,7 +2,7 @@
 
 namespace Sb {
       namespace TcpConnection {
-            void create(const std::string&dest, const uint16_t port, std::shared_ptr<TcpStreamIf> client) {
+            void create(std::string const&dest, uint16_t const port, std::shared_ptr<TcpStreamIf> const& client) {
                   InetDest inetDest = Socket::destFromString(dest, port);
                   if (inetDest.valid) {
                         TcpStream::create(client, inetDest);
@@ -15,7 +15,7 @@ namespace Sb {
             }
       }
 
-      TcpConn::TcpConn(std::shared_ptr<TcpStreamIf> client, uint16_t port) : client(client), port(port) {
+      TcpConn::TcpConn(std::shared_ptr<TcpStreamIf> const& client, uint16_t const port) : client(client), port(port) {
       }
 
       TcpConn::~TcpConn() {
@@ -26,7 +26,7 @@ namespace Sb {
             }
       }
 
-      void TcpConn::doConnect(std::shared_ptr<TcpConn>&ref, InetDest const&dest) {
+      void TcpConn::doConnect(std::shared_ptr<TcpConn> const& ref, InetDest const&dest) {
             std::lock_guard<std::mutex> sync(lock);
             if (client) {
                   TcpStream::create(client, dest);

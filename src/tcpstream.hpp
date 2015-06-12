@@ -22,12 +22,12 @@ namespace Sb {
 
       class TcpStream : public Socket {
       public:
-            static void create(std::shared_ptr<TcpStreamIf> client, int const fd);
-            static void create(std::shared_ptr<TcpStreamIf> client, InetDest const&dest);
+            static void create(std::shared_ptr<TcpStreamIf> const& client, int const fd);
+            static void create(std::shared_ptr<TcpStreamIf> const& client, InetDest const&dest);
             void queueWrite(const Bytes&data);
             void disconnect();
-            TcpStream(std::shared_ptr<TcpStreamIf> client);
-            TcpStream(std::shared_ptr<TcpStreamIf> client, int const fd);
+            TcpStream(std::shared_ptr<TcpStreamIf> const& client);
+            TcpStream(std::shared_ptr<TcpStreamIf> const& client, int const fd);
             virtual ~TcpStream();
             bool didConnect() const;
             InetDest endPoint() const;

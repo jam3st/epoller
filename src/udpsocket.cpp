@@ -2,17 +2,17 @@
 #include "engine.hpp"
 
 namespace Sb {
-      void UdpSocket::create(uint16_t const localPort, std::shared_ptr<UdpSocketIf>& client) {
-            std::shared_ptr<Socket> ref = std::make_shared<UdpSocket>(client);
-            dynamic_cast<UdpSocket*>(ref.get())->bindAndAdd(ref, localPort, client);
+      void UdpSocket::create(uint16_t const localPort, std::shared_ptr<UdpSocketIf> const& client) {
+            std::shared_ptr<UdpSocket> ref = std::make_shared<UdpSocket>(client);
+            ref->bindAndAdd(ref, localPort, client);
       }
 
-      void UdpSocket::create(InetDest const& dest, std::shared_ptr<UdpSocketIf>& client) {
-            std::shared_ptr<Socket> ref = std::make_shared<UdpSocket>(client);
-            dynamic_cast<UdpSocket*>(ref.get())->connectAndAdd(ref, dest, client);
+      void UdpSocket::create(InetDest const& dest, std::shared_ptr<UdpSocketIf> const& client) {
+            std::shared_ptr<UdpSocket> ref = std::make_shared<UdpSocket>(client);
+            ref->connectAndAdd(ref, dest, client);
       }
 
-      UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf>& client) : Socket(UDP), client(client) {
+      UdpSocket::UdpSocket(std::shared_ptr<UdpSocketIf> const& client) : Socket(UDP), client(client) {
             logDebug(std::string("UdpClient::UdpClient " + std::to_string(fd)));
             pErrorThrow(fd);
       }
@@ -20,18 +20,20 @@ namespace Sb {
       UdpSocket::~UdpSocket() {
       }
 
-      void UdpSocket::connectAndAdd(std::shared_ptr<Socket>& me, InetDest const& dest, std::shared_ptr<UdpSocketIf>& client) {
+      void UdpSocket::connectAndAdd(std::shared_ptr<UdpSocket> const& me, InetDest const& dest, std::shared_ptr<UdpSocketIf> const& client) {
             client->udpSocket = me;
             makeTransparent();
-            Engine::add(me);
+            std::shared_ptr<Socket> sockRef = me;
+            Engine::add(sockRef);
             connect(dest);
             client->connected(dest);
       }
 
-      void UdpSocket::bindAndAdd(std::shared_ptr<Socket>& me, uint16_t const localPort, std::shared_ptr<UdpSocketIf>& client) {
+      void UdpSocket::bindAndAdd(std::shared_ptr<UdpSocket> const& me, uint16_t const localPort, std::shared_ptr<UdpSocketIf> const& client) {
             client->udpSocket = me;
             makeTransparent();
-            Engine::add(me);
+            std::shared_ptr<Socket> sockRef = me;
+            Engine::add(sockRef);
             bind(localPort);
       }
 
@@ -61,7 +63,7 @@ namespace Sb {
             Engine::remove(self);
       }
 
-      void UdpSocket::doWrite(const InetDest& dest, const Bytes& data) {
+      void UdpSocket::doWrite(InetDest const& dest, Bytes const& data) {
             logDebug(std::string("UdpSocket::doWrite writing " + dest.toString() + " " + std::to_string(data.size())) + " " + std::to_string(fd));
             const auto actuallySent = sendDatagram(dest, data);
             logDebug(std::string("UdpSocket::doWrite actually wrote " + std::to_string(actuallySent)));

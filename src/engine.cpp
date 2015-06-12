@@ -224,7 +224,7 @@ namespace Sb {
             }
       }
 
-      void Engine::doAdd(std::shared_ptr<Socket>& what) {
+      void Engine::doAdd(std::shared_ptr<Socket> const& what) {
             if(!stopping) {
                   auto const epollOut = what->waitingOutEvent();
                   std::lock_guard<std::mutex> sync(evHashLock);
@@ -238,14 +238,14 @@ namespace Sb {
             }
       }
 
-      void Engine::add(std::shared_ptr<Socket>& what) {
+      void Engine::add(std::shared_ptr<Socket> const& what) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Engine::add Please call Engine::Init() first");
             }
             theEngine->doAdd(what);
       }
 
-      void Engine::doRemove(std::weak_ptr<Socket>& what) {
+      void Engine::doRemove(std::weak_ptr<Socket> const& what) {
             if(!stopping) {
                   auto const ref = what.lock();
                   if(ref) {
@@ -263,7 +263,7 @@ namespace Sb {
             }
       }
 
-      void Engine::remove(std::weak_ptr<Socket>& what) {
+      void Engine::remove(std::weak_ptr<Socket> const& what) {
             if(Engine::theEngine == nullptr) {
                   throw std::runtime_error("Engine::remove Please call Engine::Init() first");
             }

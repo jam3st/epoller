@@ -15,8 +15,8 @@ namespace Sb {
             static void start(int minWorkersPerCpu = 4);
             static void stop();
             static void init();
-            static void add(std::shared_ptr<Socket>& what);
-            static void remove(std::weak_ptr<Socket>& what);
+            static void add(std::shared_ptr<Socket> const& what);
+            static void remove(std::weak_ptr<Socket> const& what);
             static void triggerWrites(Socket* const what);
             static void runAsync(Event const& event);
             static Resolver&resolver();
@@ -43,8 +43,8 @@ namespace Sb {
             void run(Socket* const sock, const uint32_t events);
             void doEpoll();
             void worker(Worker&me);
-            void doAdd(std::shared_ptr<Socket>& what);
-            void doRemove(std::weak_ptr<Socket>& what);
+            void doAdd(std::shared_ptr<Socket> const& what);
+            void doRemove(std::weak_ptr<Socket> const& what);
             void doTriggerWrites(Socket* const what);
             void doRunAsync(Event const& event);
             void clearTimer() const;

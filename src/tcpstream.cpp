@@ -2,48 +2,46 @@
 #include "tcpstream.hpp"
 
 namespace Sb {
-      void TcpStream::create(std::shared_ptr<TcpStreamIf> client, int const fd) {
+      void TcpStream::create(std::shared_ptr<TcpStreamIf> const& client, int const fd) {
             auto ref = std::make_shared<TcpStream>(client, fd);
             client->tcpStream = ref;
-            auto sock = dynamic_cast<TcpStream*>(ref.get());
-            sock->notifyWriteComplete = Event(ref, std::bind(&TcpStream::asyncWriteComplete, sock));
-            sock->activity = Event(ref, std::bind(&TcpStream::asyncDisconnect, sock));
-            sock->egress = Event(ref, std::bind(&TcpStream::asyncEgress, sock));
-            sock->connected = true;
-            Engine::runAsync(sock->notifyWriteComplete);
-            dynamic_cast<TcpStream*>(ref.get())->originalDestination();
-            { ref->egressRate = 4096 * 1024; }
+            ref->notifyWriteComplete = Event(ref, std::bind(&TcpStream::asyncWriteComplete, ref));
+            ref->activity = Event(ref, std::bind(&TcpStream::asyncDisconnect, ref));
+            ref->egress = Event(ref, std::bind(&TcpStream::asyncEgress, ref));
+            ref->connected = true;
+            Engine::runAsync(ref->notifyWriteComplete);
+            { ref->originalDestination();
+             ref->egressRate = 4096 * 1024; }
             std::shared_ptr<Socket> sockRef = ref;
             Engine::add(sockRef);
       }
 
-      void TcpStream::create(std::shared_ptr<TcpStreamIf> client, InetDest const& dest) {
+      void TcpStream::create(std::shared_ptr<TcpStreamIf> const& client, InetDest const& dest) {
             auto ref = std::make_shared<TcpStream>(client);
-            auto sock = dynamic_cast<TcpStream*>(ref.get());
             client->tcpStream = ref;
-            sock->notifyWriteComplete = Event(ref, std::bind(&TcpStream::asyncWriteComplete, sock));
-            sock->activity = Event(ref, std::bind(&TcpStream::asyncDisconnect, sock));
-            sock->egress = Event(ref, std::bind(&TcpStream::asyncEgress, sock));
+            ref->notifyWriteComplete = Event(ref, std::bind(&TcpStream::asyncWriteComplete, ref));
+            ref->activity = Event(ref, std::bind(&TcpStream::asyncDisconnect, ref));
+            ref->egress = Event(ref, std::bind(&TcpStream::asyncEgress, ref));
 
-            auto const err = dynamic_cast<TcpStream*>(ref.get())->connect(dest);
+            auto const err = ref->connect(dest);
             if(err >= 0) {
-                  sock->connected = true;
-                  Engine::setTimer(sock->activity, sock->inactivityTimeout);
+                  ref->connected = true;
+                  Engine::setTimer(ref->activity, ref->inactivityTimeout);
             } else if(err == -1) {
-                  dynamic_cast<TcpStream*>(ref.get())->connected = false;
-                  Engine::setTimer(sock->activity, sock->inactivityTimeout);
+                  ref->connected = false;
+                  Engine::setTimer(ref->activity, ref->inactivityTimeout);
             } else {
-                  pErrorLog(err, sock->fd);
+                  pErrorLog(err, ref->fd);
                   return;
             }
             std::shared_ptr<Socket> sockRef = ref;
             Engine::add(sockRef);
       }
 
-      TcpStream::TcpStream(std::shared_ptr<TcpStreamIf> client) : Socket(TCP), client(client) {
+      TcpStream::TcpStream(std::shared_ptr<TcpStreamIf> const& client) : Socket(TCP), client(client) {
       }
 
-      TcpStream::TcpStream(std::shared_ptr<TcpStreamIf> client, int const fd) : Socket(TCP, fd), client(client) {
+      TcpStream::TcpStream(std::shared_ptr<TcpStreamIf> const& client, int const fd) : Socket(TCP, fd), client(client) {
             makeNonBlocking();
       }
 

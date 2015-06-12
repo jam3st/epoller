@@ -160,7 +160,7 @@ private:
 
 class Remote : public TcpStreamIf {
 public:
-      Remote(const std::weak_ptr<TcpStreamIf> ep, Bytes& initWrite) : ep(ep), initWrite(initWrite) {
+      Remote(const std::weak_ptr<HttpProxy> ep, Bytes& initWrite) : ep(ep), initWrite(initWrite) {
       }
 
       virtual ~Remote() {
@@ -180,14 +180,14 @@ public:
       virtual void received(const Bytes& x) override {
             auto ref = ep.lock();
             if(ref) {
-                  dynamic_cast<HttpProxy*>(ref.get())->queueWrite(x);
+                  ref->queueWrite(x);
             }
       }
 
       virtual void disconnected() override {
             auto ref = ep.lock();
             if(ref) {
-                  dynamic_cast<HttpProxy*>(ref.get())->disconnect();
+                  ref->disconnect();
             }
       }
 
@@ -219,7 +219,7 @@ public:
       }
 
 private:
-      std::weak_ptr<TcpStreamIf> ep;
+      std::weak_ptr<HttpProxy> ep;
       Bytes initWrite;
       std::mutex lock;
       bool epDisconnected = false;
@@ -288,7 +288,7 @@ void HttpProxy::received(const Bytes& x) {
             port = 443;
       };
 
-      auto sp = std::make_shared<Remote>(shared_from_this(), header);
+      auto sp = std::make_shared<Remote>(std::dynamic_pointer_cast<HttpProxy>(shared_from_this()), header);
       TcpConnection::create(host, port, sp);
       ep = sp;
       if(port == 443) {

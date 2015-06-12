@@ -17,7 +17,7 @@ namespace Sb {
 
       class QueryHandlerIf {
       public:
-            virtual void requestComplete(uint16_t const reqNo, Query::Qanswer const&ans) = 0;
+            virtual void requestComplete(uint16_t const reqNo, Query::Qanswer const& ans) = 0;
             virtual void requestError(uint16_t const reqNo) = 0;
       };
 
@@ -25,17 +25,17 @@ namespace Sb {
       public:
             ResolverImpl();
             ~ResolverImpl();
-            void resolve(std::shared_ptr<ResolverIf> client, const std::string&name, const Resolver::AddrPref&prefs, const NanoSecs&timeout,
-                         const InetDest&nameServer);
+            void resolve(std::shared_ptr<ResolverIf> const& client, std::string const& name, Resolver::AddrPref const& prefs, NanoSecs const& timeout,
+                         InetDest const& nameServer);
             void cancel(const ResolverIf* client);
-            void requestComplete(uint16_t const reqNo, Query::Qanswer const&ans) override;
+            void requestComplete(uint16_t const reqNo, Query::Qanswer const& ans) override;
             void requestError(uint16_t const reqNo) override;
             void queryTimedout(uint16_t const reqNo);
       private:
             class Names {
             public:
-                  bool get(const Resolver::AddrPref&prefs, IpAddr&addr) const;
-                  void put(const Query::Qanswer&ans);
+                  bool get(const Resolver::AddrPref& prefs, IpAddr& addr) const;
+                  void put(const Query::Qanswer& ans);
                   mutable size_t lastAccessIndex;
                   std::vector<TimePointNs> expiry;
                   std::vector<IpAddr> addrs;

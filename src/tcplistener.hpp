@@ -6,9 +6,9 @@
 namespace Sb {
       class TcpListener final : virtual public Socket {
       public:
-            static void create(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory);
+            static void create(uint16_t const port, std::function<std::shared_ptr<TcpStreamIf>()> const& clientFactory);
             virtual ~TcpListener();
-            TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory);
+            TcpListener(uint16_t const port, std::function<std::shared_ptr<TcpStreamIf>()> const& clientFactory);
       private:
             virtual void handleRead() override;
       private:

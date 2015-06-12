@@ -4,12 +4,13 @@
 
 namespace Sb {
       void
-      TcpListener::create(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) {
+      TcpListener::create(uint16_t const port, std::function<std::shared_ptr<TcpStreamIf>()> const& clientFactory) {
             std::shared_ptr<Socket> ref = std::make_shared<TcpListener>(port, clientFactory);
             Engine::add(ref);
       }
 
-      TcpListener::TcpListener(const uint16_t port, std::function<std::shared_ptr<TcpStreamIf>()> clientFactory) : Socket(TCP), clientFactory(clientFactory) {
+      TcpListener::TcpListener(uint16_t const port, std::function<std::shared_ptr<TcpStreamIf>()> const& clientFactory) : Socket(TCP),
+                                                                                                                          clientFactory(clientFactory) {
             reuseAddress();
             makeTransparent();
             bind(port);

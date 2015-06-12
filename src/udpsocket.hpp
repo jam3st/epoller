@@ -18,14 +18,15 @@ namespace Sb {
             virtual void writeComplete() = 0;
             virtual void disconnect() = 0;
       protected:
-            std::weak_ptr<Socket> udpSocket;
+            std::weak_ptr<UdpSocket> udpSocket;
       };
 
       class UdpSocket final : virtual public Socket {
       public:
-            static void create(uint16_t const localPort, std::shared_ptr<UdpSocketIf>& client);
-            static void create(InetDest const& dest, std::shared_ptr<UdpSocketIf>& client);
-            void queueWrite(const InetDest& dest, const Bytes& data);
+            static void create(uint16_t const localPort, std::shared_ptr<UdpSocketIf> const& client);
+            static void create(InetDest const& dest, std::shared_ptr<UdpSocketIf> const& client);
+            UdpSocket(std::shared_ptr<UdpSocketIf> const& client);
+            void queueWrite(InetDest const& dest, Bytes const& data);
             void disconnect();
             virtual ~UdpSocket();
             virtual void handleRead() override;
@@ -33,16 +34,14 @@ namespace Sb {
             virtual void handleError() override;
             virtual bool waitingOutEvent() override;
             void doWrite(const InetDest& dest, const Bytes& data);
-            UdpSocket(std::shared_ptr<UdpSocketIf>& client);
+
       private:
-            void bindAndAdd(std::shared_ptr<Socket>& me, uint16_t const localPort, std::shared_ptr<UdpSocketIf>& client);
-            void connectAndAdd(std::shared_ptr<Socket>& me, InetDest const& dest, std::shared_ptr<UdpSocketIf>& client);
+            void bindAndAdd(std::shared_ptr<UdpSocket> const& me, uint16_t const localPort, std::shared_ptr<UdpSocketIf> const& client);
+            void connectAndAdd(std::shared_ptr<UdpSocket> const& me, InetDest const& dest, std::shared_ptr<UdpSocketIf> const& client);
       private:
             std::shared_ptr<UdpSocketIf> client;
-            //                InetDest myDest;
             std::mutex writeLock;
             std::mutex readLock;
-            //                bool waitingWriteEvent;
-            std::deque<std::pair<const InetDest, const Bytes>> writeQueue;
+            std::deque<std::pair<InetDest const, Bytes const      >> writeQueue;
       };
 }

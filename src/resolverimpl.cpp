@@ -22,7 +22,7 @@ namespace Sb {
                   logDebug("UdpResolver::connected " + to.toString());
                   auto sock = udpSocket.lock();
                   if (sock) {
-                        dynamic_cast<UdpSocket*>(sock.get())->queueWrite(to, Query::resolve(requestNo, name, qType));
+                        sock->queueWrite(to, Query::resolve(requestNo, name, qType));
                   }
             }
 
@@ -50,7 +50,7 @@ namespace Sb {
                   logDebug("UdpResolver::onWriteCompleted");
                   auto sock = udpSocket.lock();
                   if (sock) {
-                        dynamic_cast<UdpSocket*>(sock.get())->disconnect();
+                        sock->disconnect();
                   }
             }
 
@@ -97,8 +97,8 @@ namespace Sb {
             }
       }
 
-      void ResolverImpl::resolve(std::shared_ptr<ResolverIf> client, const std::string&name, const Resolver::AddrPref&prefs, const NanoSecs&timeout,
-                                 const InetDest&nameServer) {
+      void ResolverImpl::resolve(std::shared_ptr<ResolverIf> const& client, std::string const& name, Resolver::AddrPref const&prefs, NanoSecs const&timeout,
+                                 InetDest const&nameServer) {
             std::lock_guard<std::mutex> sync(lock);
             auto it = byName.find(name);
             if (it != byName.end()) {

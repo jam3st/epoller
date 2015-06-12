@@ -77,7 +77,8 @@ namespace Sb {
             std::array<uint16_t, ADDR_LEN_SIZE_T> d;
       };
 
-      struct InetDest {
+      class InetDest {
+      public:
             std::string toString() const {
                   return addr.toString() + "=>" + std::to_string(port);
             }

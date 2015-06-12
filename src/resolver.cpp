@@ -17,7 +17,7 @@ namespace Sb {
             }
       }
 
-      void Resolver::resolve(std::shared_ptr<ResolverIf>& client, std::string const& name, AddrPref const& prefs, NanoSecs const& timeout,
+      void Resolver::resolve(std::shared_ptr<ResolverIf> const& client, std::string const& name, AddrPref const& prefs, NanoSecs const& timeout,
                              InetDest const& nameServer) {
             if(impl) {
                   impl->resolve(client, name, prefs, timeout, nameServer);
